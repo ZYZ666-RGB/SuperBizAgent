@@ -12,6 +12,7 @@ public class MemoryProperties {
     private int windowSize = 6;
     private int summaryThreshold = 12;
     private LongTerm longTerm = new LongTerm();
+    private Vector vector = new Vector();
 
     public boolean isEnabled() {
         return enabled;
@@ -55,6 +56,14 @@ public class MemoryProperties {
 
     public void setLongTerm(LongTerm longTerm) {
         this.longTerm = longTerm;
+    }
+
+    public Vector getVector() {
+        return vector;
+    }
+
+    public void setVector(Vector vector) {
+        this.vector = vector;
     }
 
     public static class LongTerm {
@@ -120,6 +129,36 @@ public class MemoryProperties {
 
         public void setMinFutureUsefulnessScore(double minFutureUsefulnessScore) {
             this.minFutureUsefulnessScore = minFutureUsefulnessScore;
+        }
+    }
+
+    public static class Vector {
+        private boolean enabled = true;
+        private String collectionName = "user_memory";
+        private int dimension = 1024;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getCollectionName() {
+            return collectionName;
+        }
+
+        public void setCollectionName(String collectionName) {
+            this.collectionName = collectionName;
+        }
+
+        public int getDimension() {
+            return dimension;
+        }
+
+        public void setDimension(int dimension) {
+            this.dimension = dimension;
         }
     }
 }

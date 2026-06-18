@@ -32,6 +32,10 @@ memory:
     min-evidence-score: 0.8
     min-stability-score: 0.6
     min-future-usefulness-score: 0.7
+  vector:
+    enabled: true
+    collection-name: user_memory
+    dimension: 1024
 
 # Spring AI Alibaba DashScope 配置
 spring:

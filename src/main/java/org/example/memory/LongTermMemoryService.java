@@ -20,6 +20,7 @@ public class LongTermMemoryService {
     private final MemoryExtractorService memoryExtractorService;
     private final MemoryAdmissionService memoryAdmissionService;
     private final MemoryDedupService memoryDedupService;
+    private final MemoryVectorService memoryVectorService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public LongTermMemoryService(
@@ -27,19 +28,40 @@ public class LongTermMemoryService {
             UserMemoryRepository userMemoryRepository,
             MemoryExtractorService memoryExtractorService,
             MemoryAdmissionService memoryAdmissionService,
-            MemoryDedupService memoryDedupService) {
+            MemoryDedupService memoryDedupService,
+            MemoryVectorService memoryVectorService) {
         this.memoryProperties = memoryProperties;
         this.userMemoryRepository = userMemoryRepository;
         this.memoryExtractorService = memoryExtractorService;
         this.memoryAdmissionService = memoryAdmissionService;
         this.memoryDedupService = memoryDedupService;
+        this.memoryVectorService = memoryVectorService;
     }
 
-    public List<UserMemory> getSemanticMemoriesForPrompt(String userId) {
+    public List<UserMemory> getSemanticMemoriesForPrompt(String userId, String query) {
         if (!isLongTermEnabled()) {
             return List.of();
         }
-        return userMemoryRepository.findEnabledForPrompt(userId, memoryProperties.getLongTerm().getTopK());
+        int topK = memoryProperties.getLongTerm().getTopK();
+        if (query != null && !query.isBlank()) {
+            try {
+                List<UserMemory> vectorResults = memoryVectorService.searchMemories(userId, query, null, topK);
+                if (!vectorResults.isEmpty()) {
+                    userMemoryRepository.markAccessed(vectorResults.stream()
+                            .map(UserMemory::getMemoryId)
+                            .toList());
+                    return vectorResults;
+                }
+            } catch (Exception e) {
+                logger.warn("Vector memory search failed, falling back to MySQL. userId={}, error={}",
+                        userId, e.getMessage());
+            }
+        }
+        List<UserMemory> mysqlResults = userMemoryRepository.findEnabledForPrompt(userId, topK);
+        userMemoryRepository.markAccessed(mysqlResults.stream()
+                .map(UserMemory::getMemoryId)
+                .toList());
+        return mysqlResults;
     }
 
     public List<UserMemory> getEpisodicMemoriesForPrompt(String userId) {
@@ -82,6 +104,12 @@ public class LongTermMemoryService {
 
         UserMemory memory = toUserMemory(userId, sessionId, candidate);
         userMemoryRepository.insert(memory);
+        try {
+            memoryVectorService.indexMemory(memory);
+        } catch (Exception e) {
+            logger.warn("Failed to index long-term memory vector. memoryId={}, error={}",
+                    memory.getMemoryId(), e.getMessage());
+        }
         logger.info("Saved long-term memory. userId={}, sessionId={}, type={}, memoryId={}",
                 userId, sessionId, memory.getMemoryType(), memory.getMemoryId());
         return List.of(memory);

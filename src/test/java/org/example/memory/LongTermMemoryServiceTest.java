@@ -21,6 +21,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class LongTermMemoryServiceTest {
@@ -28,6 +29,7 @@ class LongTermMemoryServiceTest {
     private EmbeddedDatabase database;
     private LongTermMemoryService longTermMemoryService;
     private UserMemoryRepository userMemoryRepository;
+    private MemoryVectorService memoryVectorService;
 
     @BeforeEach
     void setUp() {
@@ -44,12 +46,14 @@ class LongTermMemoryServiceTest {
         MemorySafetyService memorySafetyService = new MemorySafetyService();
         MemoryAdmissionService memoryAdmissionService = new MemoryAdmissionService(memoryProperties, memorySafetyService);
         MemoryDedupService memoryDedupService = new MemoryDedupService(userMemoryRepository);
+        memoryVectorService = mock(MemoryVectorService.class);
         longTermMemoryService = new LongTermMemoryService(
                 memoryProperties,
                 userMemoryRepository,
                 new MemoryExtractorService(),
                 memoryAdmissionService,
-                memoryDedupService);
+                memoryDedupService,
+                memoryVectorService);
     }
 
     @AfterEach
@@ -71,6 +75,7 @@ class LongTermMemoryServiceTest {
         assertThat(saved.get(0).getMemoryType()).isEqualTo("preference");
         assertThat(saved.get(0).getContent()).contains("Agent");
         assertThat(longTermMemoryService.countEnabledByUser("user-a")).isEqualTo(1);
+        verify(memoryVectorService).indexMemory(saved.get(0));
 
         List<UserMemory> duplicate = longTermMemoryService.extractAndSaveAfterChat(
                 "user-a",
@@ -170,6 +175,46 @@ class LongTermMemoryServiceTest {
                 .extracting(UserMemory::getContent)
                 .anyMatch(content -> content.contains("SuperBizAgent"))
                 .noneMatch(content -> content.contains("OtherProject"));
+    }
+
+    @Test
+    void vectorPromptRetrievalMarksMemoryAsAccessed() {
+        List<UserMemory> saved = longTermMemoryService.extractAndSaveAfterChat(
+                "user-a",
+                "session-a",
+                "记住，我希望回答数据库问题时优先结合 MySQL。",
+                "好的。",
+                null);
+        UserMemory memory = saved.get(0);
+        when(memoryVectorService.searchMemories("user-a", "数据库怎么设计？", null, 5))
+                .thenReturn(List.of(memory));
+
+        List<UserMemory> promptMemories = longTermMemoryService.getSemanticMemoriesForPrompt(
+                "user-a", "数据库怎么设计？");
+
+        assertThat(promptMemories).extracting(UserMemory::getMemoryId).containsExactly(memory.getMemoryId());
+        assertThat(userMemoryRepository.findEnabledByUserAndType("user-a", memory.getMemoryType(), 10))
+                .extracting(UserMemory::getAccessCount)
+                .containsExactly(1);
+    }
+
+    @Test
+    void promptRetrievalFallsBackToMysqlWhenVectorSearchFails() {
+        longTermMemoryService.extractAndSaveAfterChat(
+                "user-a",
+                "session-a",
+                "记住，我的记忆系统优先使用 MySQL 元数据。",
+                "好的。",
+                null);
+        when(memoryVectorService.searchMemories("user-a", "memory storage", null, 5))
+                .thenThrow(new RuntimeException("milvus down"));
+
+        List<UserMemory> promptMemories = longTermMemoryService.getSemanticMemoriesForPrompt(
+                "user-a", "memory storage");
+
+        assertThat(promptMemories)
+                .extracting(UserMemory::getContent)
+                .anyMatch(content -> content.contains("MySQL"));
     }
 
     private ChatResponse chatResponse(String content) {

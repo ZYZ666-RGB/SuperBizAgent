@@ -11,6 +11,11 @@ public class MilvusConstants {
      * Milvus 集合名称
      */
     public static final String MILVUS_COLLECTION_NAME = "biz";
+
+    /**
+     * Milvus collection for user long-term memories.
+     */
+    public static final String USER_MEMORY_COLLECTION_NAME = "user_memory";
     
     /**
      * 向量维度（豆包 embedding 模型的维度）
@@ -26,6 +31,11 @@ public class MilvusConstants {
      * Content字段最大长度
      */
     public static final int CONTENT_MAX_LENGTH = 8192;
+
+    /**
+     * Standard varchar length for memory metadata fields.
+     */
+    public static final int MEMORY_FIELD_MAX_LENGTH = 256;
     
     /**
      * 默认分片数

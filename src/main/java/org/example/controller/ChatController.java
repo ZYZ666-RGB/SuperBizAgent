@@ -92,7 +92,8 @@ public class ChatController {
             DashScopeChatModel chatModel = chatService.createStandardChatModel(dashScopeApi);
             chatService.logAvailableTools();
 
-            MemoryPromptContext memoryContext = memoryContextBuilder.buildForChat(userId, sessionId);
+            MemoryPromptContext memoryContext = memoryContextBuilder.buildForChat(
+                    userId, sessionId, request.getQuestion());
             String systemPrompt = chatService.buildSystemPrompt(memoryContext);
             ReactAgent agent = chatService.createReactAgent(chatModel, systemPrompt);
 
@@ -156,7 +157,8 @@ public class ChatController {
                 DashScopeChatModel chatModel = chatService.createStandardChatModel(dashScopeApi);
                 chatService.logAvailableTools();
 
-                MemoryPromptContext memoryContext = memoryContextBuilder.buildForChat(userId, sessionId);
+                MemoryPromptContext memoryContext = memoryContextBuilder.buildForChat(
+                        userId, sessionId, request.getQuestion());
                 String systemPrompt = chatService.buildSystemPrompt(memoryContext);
                 ReactAgent agent = chatService.createReactAgent(chatModel, systemPrompt);
 

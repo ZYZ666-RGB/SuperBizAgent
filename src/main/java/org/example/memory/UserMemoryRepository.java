@@ -128,6 +128,21 @@ public class UserMemoryRepository {
         return jdbcTemplate.query(sql, rowMapper, userId, Math.max(1, limit));
     }
 
+    public void markAccessed(List<String> memoryIds) {
+        if (memoryIds == null || memoryIds.isEmpty()) {
+            return;
+        }
+        String sql = """
+                UPDATE user_memory
+                SET access_count = access_count + 1,
+                    last_accessed_at = CURRENT_TIMESTAMP
+                WHERE memory_id = ?
+                """;
+        jdbcTemplate.batchUpdate(sql, memoryIds.stream()
+                .map(memoryId -> new Object[]{memoryId})
+                .toList());
+    }
+
     public Optional<UserMemory> findEnabledExactContent(String userId, String memoryType, String content) {
         String sql = """
                 SELECT *

@@ -71,7 +71,8 @@ class MemoryLayerTest {
                 userMemoryRepository,
                 new MemoryExtractorService(),
                 memoryAdmissionService,
-                memoryDedupService);
+                memoryDedupService,
+                mock(MemoryVectorService.class));
         memoryContextBuilder = new MemoryContextBuilder(
                 memoryProperties,
                 conversationMemoryService,
