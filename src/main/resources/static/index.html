@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperBiz Agent</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Markdown 渲染库 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <!-- 代码高亮库 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/es/highlight.min.js"></script>
+    <!-- 图标库 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- 左侧边栏 -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="ri-robot-2-line"></i>
+                    </div>
+                    <span class="logo-text">SuperBiz</span>
+                </div>
+                <button class="sidebar-toggle-btn" id="sidebarCollapseBtn" title="收起侧边栏">
+                    <i class="ri-side-bar-line"></i>
+                </button>
+            </div>
+            
+            <div class="sidebar-content">
+                <button class="new-chat-btn" id="newChatBtn">
+                    <i class="ri-add-line"></i>
+                    <span>新建对话</span>
+                </button>
+                
+                <div class="sidebar-divider"></div>
+                
+                <div class="chat-history-section">
+                    <div class="history-header">
+                        <i class="ri-chat-history-line"></i>
+                        <span>历史对话</span>
+                    </div>
+                    <div class="chat-history-list" id="chatHistoryList">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="sidebar-footer-item" id="themeToggle">
+                    <i class="ri-moon-line" id="themeIcon"></i>
+                    <span>深色模式</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 侧边栏收起时的展开按钮 -->
+        <button class="sidebar-expand-btn" id="sidebarExpandBtn" title="展开侧边栏">
+            <i class="ri-menu-line"></i>
+        </button>
+
+        <!-- 主内容区域 -->
+        <main class="main-content">
+            <!-- 顶部工具栏 -->
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <div class="model-badge">
+                        <i class="ri-brain-line"></i>
+                        <span>Qwen Agent</span>
+                    </div>
+                </div>
+                <div class="top-bar-right">
+                    <button class="action-btn ai-ops-btn" id="aiOpsBtn" title="AI 智能运维">
+                        <i class="ri-pulse-line"></i>
+                        <span>AI Ops</span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="chat-container" id="chatContainer">
+                <!-- 欢迎页面 -->
+                <div class="welcome-screen" id="welcomeScreen">
+                    <div class="welcome-icon">
+                        <i class="ri-robot-2-line"></i>
+                    </div>
+                    <h1 class="welcome-title">你好，我是 SuperBiz Agent</h1>
+                    <p class="welcome-subtitle">智能问答 · 知识检索 · 运维诊断</p>
+                    <div class="welcome-cards">
+                        <div class="welcome-card" data-prompt="帮我查询当前系统有哪些活跃告警">
+                            <i class="ri-alarm-warning-line"></i>
+                            <span>查询活跃告警</span>
+                        </div>
+                        <div class="welcome-card" data-prompt="CPU使用率过高应该如何排查和处理？">
+                            <i class="ri-book-open-line"></i>
+                            <span>查询运维知识</span>
+                        </div>
+                        <div class="welcome-card" data-prompt="现在几点了？">
+                            <i class="ri-time-line"></i>
+                            <span>获取当前时间</span>
+                        </div>
+                        <div class="welcome-card" data-prompt="帮我分析一下内存使用率过高的可能原因">
+                            <i class="ri-lightbulb-line"></i>
+                            <span>智能分析问题</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 聊天消息区域 -->
+                <div class="chat-messages" id="chatMessages">
+                </div>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="chat-input-area">
+                <div class="input-container">
+                    <div class="input-box" id="inputBox">
+                        <div class="input-top">
+                            <textarea id="messageInput" placeholder="输入你的问题..." rows="1" maxlength="2000"></textarea>
+                        </div>
+                        <div class="input-bottom">
+                            <div class="input-actions-left">
+                                <button class="input-action-btn" id="uploadBtn" title="上传文件到知识库">
+                                    <i class="ri-attachment-2"></i>
+                                </button>
+                                <div class="mode-chip" id="modeChip">
+                                    <span id="modeText">流式</span>
+                                    <i class="ri-arrow-down-s-line"></i>
+                                </div>
+                                <div class="mode-popup" id="modePopup">
+                                    <div class="mode-option active" data-mode="stream">
+                                        <i class="ri-flashlight-line"></i>
+                                        <div class="mode-option-text">
+                                            <span class="mode-option-title">流式对话</span>
+                                            <span class="mode-option-desc">实时输出，体验更流畅</span>
+                                        </div>
+                                        <i class="ri-check-line mode-check"></i>
+                                    </div>
+                                    <div class="mode-option" data-mode="quick">
+                                        <i class="ri-speed-line"></i>
+                                        <div class="mode-option-text">
+                                            <span class="mode-option-title">快速对话</span>
+                                            <span class="mode-option-desc">一次性返回完整结果</span>
+                                        </div>
+                                        <i class="ri-check-line mode-check"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="input-actions-right">
+                                <button class="send-btn" id="sendButton" title="发送 (Enter)">
+                                    <i class="ri-send-plane-2-fill"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="input-hint">按 Enter 发送，Shift+Enter 换行</p>
+                </div>
+                <input type="file" id="fileInput" accept=".txt,.md,.markdown" style="display: none;">
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast 通知容器 -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
