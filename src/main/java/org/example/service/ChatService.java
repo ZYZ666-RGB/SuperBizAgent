@@ -10,6 +10,7 @@ import org.example.agent.tool.InternalDocsTools;
 import org.example.agent.tool.QueryLogsTools;
 import org.example.agent.tool.QueryMetricsTools;
 import org.example.memory.MemoryPromptContext;
+import org.example.memory.UserMemory;
 import org.example.memory.dto.ChatMessageDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,6 +131,26 @@ public class ChatService {
         systemPromptBuilder.append("当用户需要查询公司内部文档、流程、最佳实践或技术指南时，使用 queryInternalDocs 工具。\n");
         systemPromptBuilder.append("当用户需要查询 Prometheus 告警、监控指标或系统告警状态时，使用 queryPrometheusAlerts 工具。\n");
         systemPromptBuilder.append("当用户需要查询腾讯云日志时，请调用腾讯云 MCP 服务查询，默认查询区域 ap-guangzhou，查询时间范围为近一个月。\n\n");
+
+        if (memoryContext != null && !memoryContext.getSemanticMemories().isEmpty()) {
+            systemPromptBuilder.append("【用户长期语义记忆】\n");
+            for (UserMemory memory : memoryContext.getSemanticMemories()) {
+                systemPromptBuilder.append("- ")
+                        .append(memory.getContent())
+                        .append("\n");
+            }
+            systemPromptBuilder.append("\n");
+        }
+
+        if (memoryContext != null && !memoryContext.getEpisodicMemories().isEmpty()) {
+            systemPromptBuilder.append("【用户情景记忆】\n");
+            for (UserMemory memory : memoryContext.getEpisodicMemories()) {
+                systemPromptBuilder.append("- ")
+                        .append(memory.getContent())
+                        .append("\n");
+            }
+            systemPromptBuilder.append("\n");
+        }
 
         if (memoryContext != null && hasText(memoryContext.getSessionSummary())) {
             systemPromptBuilder.append("【当前会话摘要】\n");

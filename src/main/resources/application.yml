@@ -24,6 +24,14 @@ memory:
   app-id: super_biz_agent
   window-size: 6
   summary-threshold: 12
+  long-term:
+    enabled: true
+    top-k: 5
+    min-confidence: 0.75
+    min-importance: 0.6
+    min-evidence-score: 0.8
+    min-stability-score: 0.6
+    min-future-usefulness-score: 0.7
 
 # Spring AI Alibaba DashScope 配置
 spring:

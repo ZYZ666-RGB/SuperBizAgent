@@ -13,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 import org.example.memory.ConversationMemoryService;
+import org.example.memory.LongTermMemoryService;
 import org.example.memory.MemoryContextBuilder;
 import org.example.memory.MemoryPromptContext;
 import org.example.memory.SummaryMemoryService;
@@ -65,6 +66,9 @@ public class ChatController {
     private SummaryMemoryService summaryMemoryService;
 
     @Autowired
+    private LongTermMemoryService longTermMemoryService;
+
+    @Autowired
     private ToolCallbackProvider tools;
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
@@ -94,7 +98,7 @@ public class ChatController {
 
             String fullAnswer = chatService.executeChat(agent, request.getQuestion());
             saveConversationTurn(userId, sessionId, request.getQuestion(), fullAnswer);
-            refreshSummaryAsync(userId, sessionId, chatModel);
+            runPostChatMemoryPipelineAsync(userId, sessionId, request.getQuestion(), fullAnswer, chatModel);
 
             return ResponseEntity.ok(ApiResponse.success(ChatResponse.success(fullAnswer)));
         } catch (Exception e) {
@@ -321,7 +325,7 @@ public class ChatController {
             emitter.send(SseEmitter.event().name("message")
                     .data(SseMessage.done(), MediaType.APPLICATION_JSON));
             emitter.complete();
-            refreshSummaryAsync(userId, sessionId, chatModel);
+            runPostChatMemoryPipelineAsync(userId, sessionId, question, fullAnswer, chatModel);
         } catch (IOException e) {
             logger.error("Failed to complete streaming response", e);
             emitter.completeWithError(e);
@@ -334,8 +338,16 @@ public class ChatController {
         logger.info("Saved conversation turn. userId={}, sessionId={}", userId, sessionId);
     }
 
-    private void refreshSummaryAsync(String userId, String sessionId, DashScopeChatModel chatModel) {
-        executor.execute(() -> summaryMemoryService.refreshSummaryIfNeeded(userId, sessionId, chatModel));
+    private void runPostChatMemoryPipelineAsync(
+            String userId,
+            String sessionId,
+            String question,
+            String answer,
+            DashScopeChatModel chatModel) {
+        executor.execute(() -> {
+            summaryMemoryService.refreshSummaryIfNeeded(userId, sessionId, chatModel);
+            longTermMemoryService.extractAndSaveAfterChat(userId, sessionId, question, answer, chatModel);
+        });
     }
 
     private String normalizeSessionId(String sessionId) {

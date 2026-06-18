@@ -36,6 +36,7 @@ class MemoryLayerTest {
     private JdbcConversationMemoryService conversationMemoryService;
     private SummaryMemoryService summaryMemoryService;
     private MemoryContextBuilder memoryContextBuilder;
+    private LongTermMemoryService longTermMemoryService;
     private MemoryProperties memoryProperties;
 
     @BeforeEach
@@ -50,6 +51,7 @@ class MemoryLayerTest {
         JdbcTemplate jdbcTemplate = new JdbcTemplate(database);
         messageRepository = new ConversationMessageRepository(jdbcTemplate);
         summaryRepository = new ConversationSummaryRepository(jdbcTemplate);
+        UserMemoryRepository userMemoryRepository = new UserMemoryRepository(jdbcTemplate);
         conversationMemoryService = new JdbcConversationMemoryService(messageRepository, summaryRepository);
 
         memoryProperties = new MemoryProperties();
@@ -61,10 +63,20 @@ class MemoryLayerTest {
                 messageRepository,
                 summaryRepository,
                 new SummaryPromptBuilder());
+        MemorySafetyService memorySafetyService = new MemorySafetyService();
+        MemoryAdmissionService memoryAdmissionService = new MemoryAdmissionService(memoryProperties, memorySafetyService);
+        MemoryDedupService memoryDedupService = new MemoryDedupService(userMemoryRepository);
+        longTermMemoryService = new LongTermMemoryService(
+                memoryProperties,
+                userMemoryRepository,
+                new MemoryExtractorService(),
+                memoryAdmissionService,
+                memoryDedupService);
         memoryContextBuilder = new MemoryContextBuilder(
                 memoryProperties,
                 conversationMemoryService,
-                summaryMemoryService);
+                summaryMemoryService,
+                longTermMemoryService);
     }
 
     @AfterEach

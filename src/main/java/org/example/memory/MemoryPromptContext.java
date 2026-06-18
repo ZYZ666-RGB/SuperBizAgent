@@ -9,6 +9,8 @@ public class MemoryPromptContext {
 
     private String sessionSummary;
     private List<ChatMessageDTO> recentMessages = new ArrayList<>();
+    private List<UserMemory> semanticMemories = new ArrayList<>();
+    private List<UserMemory> episodicMemories = new ArrayList<>();
 
     public String getSessionSummary() {
         return sessionSummary;
@@ -24,5 +26,21 @@ public class MemoryPromptContext {
 
     public void setRecentMessages(List<ChatMessageDTO> recentMessages) {
         this.recentMessages = recentMessages == null ? new ArrayList<>() : recentMessages;
+    }
+
+    public List<UserMemory> getSemanticMemories() {
+        return semanticMemories;
+    }
+
+    public void setSemanticMemories(List<UserMemory> semanticMemories) {
+        this.semanticMemories = semanticMemories == null ? new ArrayList<>() : semanticMemories;
+    }
+
+    public List<UserMemory> getEpisodicMemories() {
+        return episodicMemories;
+    }
+
+    public void setEpisodicMemories(List<UserMemory> episodicMemories) {
+        this.episodicMemories = episodicMemories == null ? new ArrayList<>() : episodicMemories;
     }
 }

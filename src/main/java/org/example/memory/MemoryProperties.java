@@ -11,6 +11,7 @@ public class MemoryProperties {
     private String appId = "super_biz_agent";
     private int windowSize = 6;
     private int summaryThreshold = 12;
+    private LongTerm longTerm = new LongTerm();
 
     public boolean isEnabled() {
         return enabled;
@@ -46,5 +47,79 @@ public class MemoryProperties {
 
     public int getRecentMessageLimit() {
         return Math.max(1, windowSize) * 2;
+    }
+
+    public LongTerm getLongTerm() {
+        return longTerm;
+    }
+
+    public void setLongTerm(LongTerm longTerm) {
+        this.longTerm = longTerm;
+    }
+
+    public static class LongTerm {
+        private boolean enabled = true;
+        private int topK = 5;
+        private double minConfidence = 0.75;
+        private double minImportance = 0.6;
+        private double minEvidenceScore = 0.8;
+        private double minStabilityScore = 0.6;
+        private double minFutureUsefulnessScore = 0.7;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getTopK() {
+            return topK;
+        }
+
+        public void setTopK(int topK) {
+            this.topK = topK;
+        }
+
+        public double getMinConfidence() {
+            return minConfidence;
+        }
+
+        public void setMinConfidence(double minConfidence) {
+            this.minConfidence = minConfidence;
+        }
+
+        public double getMinImportance() {
+            return minImportance;
+        }
+
+        public void setMinImportance(double minImportance) {
+            this.minImportance = minImportance;
+        }
+
+        public double getMinEvidenceScore() {
+            return minEvidenceScore;
+        }
+
+        public void setMinEvidenceScore(double minEvidenceScore) {
+            this.minEvidenceScore = minEvidenceScore;
+        }
+
+        public double getMinStabilityScore() {
+            return minStabilityScore;
+        }
+
+        public void setMinStabilityScore(double minStabilityScore) {
+            this.minStabilityScore = minStabilityScore;
+        }
+
+        public double getMinFutureUsefulnessScore() {
+            return minFutureUsefulnessScore;
+        }
+
+        public void setMinFutureUsefulnessScore(double minFutureUsefulnessScore) {
+            this.minFutureUsefulnessScore = minFutureUsefulnessScore;
+        }
     }
 }

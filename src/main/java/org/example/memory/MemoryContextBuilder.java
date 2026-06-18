@@ -11,14 +11,17 @@ public class MemoryContextBuilder {
     private final MemoryProperties memoryProperties;
     private final ConversationMemoryService conversationMemoryService;
     private final SummaryMemoryService summaryMemoryService;
+    private final LongTermMemoryService longTermMemoryService;
 
     public MemoryContextBuilder(
             MemoryProperties memoryProperties,
             ConversationMemoryService conversationMemoryService,
-            SummaryMemoryService summaryMemoryService) {
+            SummaryMemoryService summaryMemoryService,
+            LongTermMemoryService longTermMemoryService) {
         this.memoryProperties = memoryProperties;
         this.conversationMemoryService = conversationMemoryService;
         this.summaryMemoryService = summaryMemoryService;
+        this.longTermMemoryService = longTermMemoryService;
     }
 
     public MemoryPromptContext buildForChat(String userId, String sessionId) {
@@ -31,6 +34,8 @@ public class MemoryContextBuilder {
         List<ChatMessageDTO> recentMessages = conversationMemoryService.getRecentMessages(
                 userId, sessionId, memoryProperties.getWindowSize());
         context.setRecentMessages(recentMessages);
+        context.setSemanticMemories(longTermMemoryService.getSemanticMemoriesForPrompt(userId));
+        context.setEpisodicMemories(longTermMemoryService.getEpisodicMemoriesForPrompt(userId));
         return context;
     }
 }

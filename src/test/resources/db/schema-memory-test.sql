@@ -22,3 +22,36 @@ CREATE TABLE conversation_summary (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_user_session UNIQUE (user_id, session_id)
 );
+
+CREATE TABLE user_memory (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    memory_id VARCHAR(64) NOT NULL UNIQUE,
+    user_id VARCHAR(64) NOT NULL,
+    session_id VARCHAR(64),
+    task_id VARCHAR(64),
+    agent_id VARCHAR(64),
+    app_id VARCHAR(64) DEFAULT 'super_biz_agent',
+    memory_type VARCHAR(30) NOT NULL,
+    scope_type VARCHAR(30) DEFAULT 'user',
+    content CLOB NOT NULL,
+    evidence CLOB,
+    entities CLOB,
+    metadata CLOB,
+    source VARCHAR(50),
+    importance DOUBLE DEFAULT 0.5,
+    confidence DOUBLE DEFAULT 1.0,
+    evidence_score DOUBLE DEFAULT 0.0,
+    stability_score DOUBLE DEFAULT 0.0,
+    future_usefulness_score DOUBLE DEFAULT 0.0,
+    safety_score INT DEFAULT 1,
+    access_count INT DEFAULT 0,
+    last_accessed_at TIMESTAMP NULL,
+    enabled TINYINT DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_user_type ON user_memory(user_id, memory_type);
+CREATE INDEX idx_user_scope ON user_memory(user_id, scope_type);
+CREATE INDEX idx_user_enabled ON user_memory(user_id, enabled);
+CREATE INDEX idx_user_agent ON user_memory(user_id, agent_id);
