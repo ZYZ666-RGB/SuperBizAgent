@@ -19,8 +19,23 @@ milvus:
   database: default
   timeout: 10000
 
+memory:
+  enabled: true
+  app-id: super_biz_agent
+  window-size: 6
+  summary-threshold: 12
+
 # Spring AI Alibaba DashScope 配置
 spring:
+  datasource:
+    url: "${MYSQL_URL:jdbc:mysql://localhost:3306/super_biz_agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}"
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema-memory.sql
   ai:
     dashscope:
       api-key: ${DASHSCOPE_API_KEY:}  # 从环境变量读取

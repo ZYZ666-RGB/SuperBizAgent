@@ -1,0 +1,45 @@
+package org.example.memory;
+
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+public class SummaryPromptBuilder {
+
+    public String build(String oldSummary, List<ConversationMessage> messages) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("请将下面的历史对话压缩成一段上下文摘要。\n\n");
+        builder.append("要求：\n");
+        builder.append("1. 只保留当前 session 中对后续回答有帮助的信息；\n");
+        builder.append("2. 保留用户项目背景、技术选择、已确认方案、重要结论；\n");
+        builder.append("3. 删除寒暄、重复、临时情绪和无意义内容；\n");
+        builder.append("4. 不要编造原文中没有的信息；\n");
+        builder.append("5. 控制在 300 字以内。\n\n");
+        builder.append("旧摘要：\n");
+        builder.append(isBlank(oldSummary) ? "无" : oldSummary).append("\n\n");
+        builder.append("新增历史：\n");
+        for (ConversationMessage message : messages) {
+            builder.append(formatRole(message.getRole())).append(": ");
+            builder.append(message.getContent()).append("\n");
+        }
+        return builder.toString();
+    }
+
+    private String formatRole(String role) {
+        if ("user".equals(role)) {
+            return "用户";
+        }
+        if ("assistant".equals(role)) {
+            return "助手";
+        }
+        if ("tool".equals(role)) {
+            return "工具";
+        }
+        return "系统";
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+}

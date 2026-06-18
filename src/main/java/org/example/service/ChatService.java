@@ -9,6 +9,8 @@ import org.example.agent.tool.DateTimeTools;
 import org.example.agent.tool.InternalDocsTools;
 import org.example.agent.tool.QueryLogsTools;
 import org.example.agent.tool.QueryMetricsTools;
+import org.example.memory.MemoryPromptContext;
+import org.example.memory.dto.ChatMessageDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
@@ -120,6 +122,57 @@ public class ChatService {
      * 动态构建方法工具数组
      * 根据 cls.mock-enabled 决定是否包含 QueryLogsTools
      */
+    public String buildSystemPrompt(MemoryPromptContext memoryContext) {
+        StringBuilder systemPromptBuilder = new StringBuilder();
+
+        systemPromptBuilder.append("你是 SuperBizAgent 智能助手，请结合记忆上下文、业务知识库和可用工具回答用户问题。\n");
+        systemPromptBuilder.append("当用户询问时间相关问题时，使用 getCurrentDateTime 工具。\n");
+        systemPromptBuilder.append("当用户需要查询公司内部文档、流程、最佳实践或技术指南时，使用 queryInternalDocs 工具。\n");
+        systemPromptBuilder.append("当用户需要查询 Prometheus 告警、监控指标或系统告警状态时，使用 queryPrometheusAlerts 工具。\n");
+        systemPromptBuilder.append("当用户需要查询腾讯云日志时，请调用腾讯云 MCP 服务查询，默认查询区域 ap-guangzhou，查询时间范围为近一个月。\n\n");
+
+        if (memoryContext != null && hasText(memoryContext.getSessionSummary())) {
+            systemPromptBuilder.append("【当前会话摘要】\n");
+            systemPromptBuilder.append(memoryContext.getSessionSummary()).append("\n\n");
+        }
+
+        if (memoryContext != null && !memoryContext.getRecentMessages().isEmpty()) {
+            systemPromptBuilder.append("【当前会话最近对话】\n");
+            for (ChatMessageDTO message : memoryContext.getRecentMessages()) {
+                systemPromptBuilder.append(formatRole(message.getRole()))
+                        .append(": ")
+                        .append(message.getContent())
+                        .append("\n");
+            }
+            systemPromptBuilder.append("\n");
+        }
+
+        systemPromptBuilder.append("【注意】\n");
+        systemPromptBuilder.append("1. 不要泄露其他用户、其他 session、其他 task 的记忆。\n");
+        systemPromptBuilder.append("2. 只使用当前 user_id 和 session_id 作用域下的记忆。\n");
+        systemPromptBuilder.append("3. 如果记忆和用户当前输入冲突，以用户当前输入为准。\n");
+        systemPromptBuilder.append("4. 如果不确定，不要编造记忆。\n");
+
+        return systemPromptBuilder.toString();
+    }
+
+    private String formatRole(String role) {
+        if ("user".equals(role)) {
+            return "用户";
+        }
+        if ("assistant".equals(role)) {
+            return "助手";
+        }
+        if ("tool".equals(role)) {
+            return "工具";
+        }
+        return "系统";
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     public Object[] buildMethodToolsArray() {
         if (queryLogsTools != null) {
             // Mock 模式：包含 QueryLogsTools

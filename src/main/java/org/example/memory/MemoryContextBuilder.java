@@ -1,0 +1,36 @@
+package org.example.memory;
+
+import org.example.memory.dto.ChatMessageDTO;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+public class MemoryContextBuilder {
+
+    private final MemoryProperties memoryProperties;
+    private final ConversationMemoryService conversationMemoryService;
+    private final SummaryMemoryService summaryMemoryService;
+
+    public MemoryContextBuilder(
+            MemoryProperties memoryProperties,
+            ConversationMemoryService conversationMemoryService,
+            SummaryMemoryService summaryMemoryService) {
+        this.memoryProperties = memoryProperties;
+        this.conversationMemoryService = conversationMemoryService;
+        this.summaryMemoryService = summaryMemoryService;
+    }
+
+    public MemoryPromptContext buildForChat(String userId, String sessionId) {
+        MemoryPromptContext context = new MemoryPromptContext();
+        if (!memoryProperties.isEnabled()) {
+            return context;
+        }
+
+        summaryMemoryService.getSummary(userId, sessionId).ifPresent(context::setSessionSummary);
+        List<ChatMessageDTO> recentMessages = conversationMemoryService.getRecentMessages(
+                userId, sessionId, memoryProperties.getWindowSize());
+        context.setRecentMessages(recentMessages);
+        return context;
+    }
+}
