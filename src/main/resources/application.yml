@@ -9,7 +9,7 @@ server:
 file:
   upload:
     path: ./uploads
-    allowed-extensions: txt,md
+    allowed-extensions: txt,md,log,json,yaml,yml,java,py,sql,pdf,docx,xlsx,pptx,html,htm
 
 milvus:
   host: localhost
@@ -108,6 +108,31 @@ document:
 rag:
   top-k: 3  # 检索返回的最相似文档数量
   model: "qwen3-max"  # 大语言模型名称
+  storage:
+    base-dir: ./rag-data
+    upload-dir: ./rag-data/uploads
+    markdown-dir: ./rag-data/parsed-md
+    chunk-dir: ./rag-data/chunks
+    log-dir: ./rag-data/logs
+  parser:
+    mode: external
+    external-url: http://localhost:7001/parse
+    fallback-to-tika: true
+    timeout-seconds: 120
+  chunk:
+    target-tokens: 700
+    max-tokens: 1000
+    min-tokens: 80
+    overlap-tokens: 100
+    enable-parent-child: true
+    enable-contextual-embedding: true
+  embedding:
+    model: text-embedding-v3
+    batch-size: 16
+    retry-times: 3
+  index:
+    vector-store: milvus
+    delete-old-before-reindex: true
 
 # Prometheus 配置
 prometheus:

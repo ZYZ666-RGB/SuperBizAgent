@@ -83,3 +83,42 @@ CREATE TABLE IF NOT EXISTS agent_task_state (
     INDEX idx_user_status (user_id, status),
     INDEX idx_user_session_task (user_id, session_id, task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS rag_document (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    document_id VARCHAR(128) NOT NULL,
+    namespace VARCHAR(128),
+    file_name VARCHAR(255),
+    file_hash VARCHAR(128),
+    file_type VARCHAR(64),
+    source_path VARCHAR(512),
+    markdown_path VARCHAR(512),
+    parser_name VARCHAR(128),
+    status VARCHAR(32),
+    chunk_count INT DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_document_id (document_id),
+    INDEX idx_rag_document_namespace (namespace),
+    INDEX idx_rag_document_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS rag_chunk (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    chunk_id VARCHAR(128) NOT NULL,
+    document_id VARCHAR(128) NOT NULL,
+    parent_chunk_id VARCHAR(128),
+    namespace VARCHAR(128),
+    file_name VARCHAR(255),
+    heading_path VARCHAR(512),
+    chunk_index INT,
+    token_count INT,
+    content TEXT,
+    embedding_content TEXT,
+    metadata_json TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_chunk_id (chunk_id),
+    INDEX idx_rag_chunk_document (document_id),
+    INDEX idx_rag_chunk_namespace (namespace),
+    INDEX idx_rag_chunk_parent (parent_chunk_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

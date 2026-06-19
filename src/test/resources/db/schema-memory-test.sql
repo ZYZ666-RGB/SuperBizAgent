@@ -75,3 +75,44 @@ CREATE TABLE agent_task_state (
 
 CREATE INDEX idx_user_status ON agent_task_state(user_id, status);
 CREATE INDEX idx_user_session_task ON agent_task_state(user_id, session_id, task_id);
+
+CREATE TABLE rag_document (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    document_id VARCHAR(128) NOT NULL,
+    namespace VARCHAR(128),
+    file_name VARCHAR(255),
+    file_hash VARCHAR(128),
+    file_type VARCHAR(64),
+    source_path VARCHAR(512),
+    markdown_path VARCHAR(512),
+    parser_name VARCHAR(128),
+    status VARCHAR(32),
+    chunk_count INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_document_id UNIQUE (document_id)
+);
+
+CREATE INDEX idx_rag_document_namespace ON rag_document(namespace);
+CREATE INDEX idx_rag_document_status ON rag_document(status);
+
+CREATE TABLE rag_chunk (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    chunk_id VARCHAR(128) NOT NULL,
+    document_id VARCHAR(128) NOT NULL,
+    parent_chunk_id VARCHAR(128),
+    namespace VARCHAR(128),
+    file_name VARCHAR(255),
+    heading_path VARCHAR(512),
+    chunk_index INT,
+    token_count INT,
+    content CLOB,
+    embedding_content CLOB,
+    metadata_json CLOB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_chunk_id UNIQUE (chunk_id)
+);
+
+CREATE INDEX idx_rag_chunk_document ON rag_chunk(document_id);
+CREATE INDEX idx_rag_chunk_namespace ON rag_chunk(namespace);
+CREATE INDEX idx_rag_chunk_parent ON rag_chunk(parent_chunk_id);
