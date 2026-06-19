@@ -101,6 +101,32 @@ public class LongTermMemoryService {
         return userMemoryRepository.findRecentEpisodicForPrompt(userId, 3);
     }
 
+    public List<UserMemory> searchMemories(String userId, String query, String memoryType, int limit) {
+        if (!isLongTermEnabled()) {
+            return List.of();
+        }
+        List<String> types = memoryType == null || memoryType.isBlank() ? null : List.of(memoryType);
+        if (query != null && !query.isBlank()) {
+            try {
+                List<UserMemory> vectorResults = memoryVectorService.searchMemories(userId, query, types, limit);
+                if (!vectorResults.isEmpty()) {
+                    userMemoryRepository.markAccessed(vectorResults.stream()
+                            .map(UserMemory::getMemoryId)
+                            .toList());
+                    return vectorResults;
+                }
+            } catch (Exception e) {
+                logger.warn("Vector memory tool search failed, falling back to MySQL. userId={}, error={}",
+                        userId, e.getMessage());
+            }
+        }
+        List<UserMemory> mysqlResults = userMemoryRepository.searchEnabledByContent(userId, query, memoryType, limit);
+        userMemoryRepository.markAccessed(mysqlResults.stream()
+                .map(UserMemory::getMemoryId)
+                .toList());
+        return mysqlResults;
+    }
+
     public List<UserMemory> extractAndSaveAfterChat(
             String userId,
             String sessionId,
@@ -153,8 +179,101 @@ public class LongTermMemoryService {
         return List.of(memory);
     }
 
+    public List<UserMemory> addManualMemory(
+            String userId,
+            String content,
+            String memoryType,
+            String scopeType,
+            double importance) {
+        MemoryCandidate candidate = new MemoryCandidate();
+        candidate.setMemoryType(defaultText(memoryType, "semantic"));
+        candidate.setScopeType(defaultText(scopeType, "user"));
+        candidate.setContent(content);
+        candidate.setEvidence(content);
+        candidate.setEntities(List.of());
+        candidate.setExplicitSave(true);
+        candidate.setSource("user_explicit");
+        candidate.setEvidenceScore(1.0);
+        candidate.setStabilityScore(0.9);
+        candidate.setFutureUsefulnessScore(0.9);
+        candidate.setSafetyScore(1);
+        candidate.setImportance(Math.max(0.0, Math.min(1.0, importance)));
+        candidate.setConfidence(0.95);
+        candidate.setShouldSave(true);
+        candidate.setReason("Added through MemoryTools.");
+        return saveCandidate(userId, null, candidate);
+    }
+
+    public boolean updateMemory(String userId, String memoryId, String newContent) {
+        if (newContent == null || newContent.isBlank()) {
+            return false;
+        }
+        MemoryCandidate updateCandidate = new MemoryCandidate();
+        updateCandidate.setContent(newContent);
+        updateCandidate.setEvidence(newContent);
+        updateCandidate.setSource("user_explicit");
+        updateCandidate.setExplicitSave(true);
+        updateCandidate.setSafetyScore(1);
+        updateCandidate.setShouldSave(true);
+        if (!memoryAdmissionService.shouldSave(updateCandidate)) {
+            return false;
+        }
+        if (userMemoryRepository.findEnabledByMemoryId(userId, memoryId).isEmpty()) {
+            return false;
+        }
+        userMemoryRepository.updateContent(userId, memoryId, newContent.trim());
+        userMemoryRepository.findEnabledByMemoryId(userId, memoryId).ifPresent(memory -> {
+            try {
+                memoryVectorService.deleteMemory(userId, memoryId);
+                memoryVectorService.indexMemory(memory);
+            } catch (Exception e) {
+                logger.warn("Failed to refresh memory vector after update. userId={}, memoryId={}, error={}",
+                        userId, memoryId, e.getMessage());
+            }
+            try {
+                if (graphMemoryService != null) {
+                    graphMemoryService.indexMemory(memory);
+                }
+            } catch (Exception e) {
+                logger.warn("Failed to refresh graph memory after update. userId={}, memoryId={}, error={}",
+                        userId, memoryId, e.getMessage());
+            }
+        });
+        return true;
+    }
+
+    public boolean removeMemory(String userId, String memoryId) {
+        if (userMemoryRepository.findEnabledByMemoryId(userId, memoryId).isEmpty()) {
+            return false;
+        }
+        disableMemory(userId, memoryId);
+        return true;
+    }
+
+    public void disableMemory(String userId, String memoryId) {
+        userMemoryRepository.disableByMemoryId(userId, memoryId);
+        try {
+            memoryVectorService.deleteMemory(userId, memoryId);
+        } catch (Exception e) {
+            logger.warn("Failed to delete memory vector. userId={}, memoryId={}, error={}",
+                    userId, memoryId, e.getMessage());
+        }
+        try {
+            if (graphMemoryService != null) {
+                graphMemoryService.disableMemory(userId, memoryId);
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to disable graph memory. userId={}, memoryId={}, error={}",
+                    userId, memoryId, e.getMessage());
+        }
+    }
+
     public long countEnabledByUser(String userId) {
         return userMemoryRepository.countEnabledByUser(userId);
+    }
+
+    public long countEnabledByUserAndType(String userId, String memoryType) {
+        return userMemoryRepository.countEnabledByUserAndType(userId, memoryType);
     }
 
     private UserMemory toUserMemory(String userId, String sessionId, MemoryCandidate candidate) {

@@ -9,6 +9,7 @@ import io.milvus.param.MetricType;
 import io.milvus.param.R;
 import io.milvus.param.RpcStatus;
 import io.milvus.param.collection.LoadCollectionParam;
+import io.milvus.param.dml.DeleteParam;
 import io.milvus.param.dml.InsertParam;
 import io.milvus.param.dml.SearchParam;
 import io.milvus.response.SearchResultsWrapper;
@@ -113,6 +114,28 @@ public class MemoryVectorService {
             return parseSearchResults(searchResponse, limit);
         } catch (Exception e) {
             throw new RuntimeException("Failed to search user memory vectors: " + e.getMessage(), e);
+        }
+    }
+
+    public void deleteMemory(String userId, String memoryId) {
+        if (!isEnabled() || userId == null || userId.isBlank() || memoryId == null || memoryId.isBlank()) {
+            return;
+        }
+        try {
+            loadCollection();
+            String expression = "user_id == \"" + escapeExpressionString(userId) + "\""
+                    + " && memory_id == \"" + escapeExpressionString(memoryId) + "\"";
+            DeleteParam deleteParam = DeleteParam.newBuilder()
+                    .withCollectionName(collectionName())
+                    .withExpr(expression)
+                    .build();
+            R<MutationResult> response = milvusClient.delete(deleteParam);
+            if (response.getStatus() != 0) {
+                throw new RuntimeException("Delete user memory vector failed: " + response.getMessage());
+            }
+            logger.info("Deleted user memory vector. userId={}, memoryId={}", userId, memoryId);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete user memory vector: " + e.getMessage(), e);
         }
     }
 

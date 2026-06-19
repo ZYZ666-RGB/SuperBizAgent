@@ -37,6 +37,7 @@ public class GraphMemoryRepository {
                         SET m.content = $content,
                             m.memoryType = $memoryType,
                             m.importance = $importance,
+                            m.enabled = true,
                             m.updatedAt = datetime()
                         MERGE (u)-[:OWNS]->(m)
                         """, Values.parameters(
@@ -63,8 +64,9 @@ public class GraphMemoryRepository {
         }
         try (Session session = driver.session()) {
             return session.executeRead(tx -> tx.run("""
-                            MATCH (u:User {userId: $userId})-[:OWNS]->(:Memory)-[:MENTIONS]->(e)
+                            MATCH (u:User {userId: $userId})-[:OWNS]->(m:Memory)-[:MENTIONS]->(e)
                             WHERE e.name IN $entityNames
+                              AND coalesce(m.enabled, true) = true
                             MATCH (e)-[r]-(related)
                             WHERE related.userId = $userId OR related:User
                             RETURN DISTINCT e.name AS source,
@@ -76,6 +78,21 @@ public class GraphMemoryRepository {
                             "entityNames", entityNames,
                             "limit", Math.max(1, limit)))
                     .list(this::formatRelation));
+        }
+    }
+
+    public void disableMemory(String userId, String memoryId) {
+        try (Session session = driver.session()) {
+            session.executeWrite(tx -> {
+                tx.run("""
+                        MATCH (m:Memory {userId: $userId, memoryId: $memoryId})
+                        SET m.enabled = false,
+                            m.updatedAt = datetime()
+                        """, Values.parameters(
+                        "userId", userId,
+                        "memoryId", memoryId));
+                return null;
+            });
         }
     }
 

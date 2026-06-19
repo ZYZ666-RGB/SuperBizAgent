@@ -7,6 +7,7 @@ import com.alibaba.cloud.ai.graph.agent.ReactAgent;
 import com.alibaba.cloud.ai.graph.exception.GraphRunnerException;
 import org.example.agent.tool.DateTimeTools;
 import org.example.agent.tool.InternalDocsTools;
+import org.example.agent.tool.MemoryTools;
 import org.example.agent.tool.QueryLogsTools;
 import org.example.agent.tool.QueryMetricsTools;
 import org.example.memory.MemoryPromptContext;
@@ -40,6 +41,9 @@ public class ChatService {
 
     @Autowired
     private QueryMetricsTools queryMetricsTools;
+
+    @Autowired
+    private MemoryTools memoryTools;
 
     @Autowired(required = false)  // Mock 模式下才注册，所以设置为 optional,真实环境通过mcp配置注入
     private QueryLogsTools queryLogsTools;
@@ -207,10 +211,10 @@ public class ChatService {
     public Object[] buildMethodToolsArray() {
         if (queryLogsTools != null) {
             // Mock 模式：包含 QueryLogsTools
-            return new Object[]{dateTimeTools, internalDocsTools, queryMetricsTools, queryLogsTools};
+            return new Object[]{dateTimeTools, internalDocsTools, queryMetricsTools, queryLogsTools, memoryTools};
         } else {
             // 真实模式：不包含 QueryLogsTools（由 MCP 提供日志查询功能）
-            return new Object[]{dateTimeTools, internalDocsTools, queryMetricsTools};
+            return new Object[]{dateTimeTools, internalDocsTools, queryMetricsTools, memoryTools};
         }
     }
 

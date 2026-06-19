@@ -18,6 +18,7 @@ import org.example.memory.LongTermMemoryService;
 import org.example.memory.MemoryContextBuilder;
 import org.example.memory.MemoryPromptContext;
 import org.example.memory.SummaryMemoryService;
+import org.example.memory.MemoryUserContext;
 import org.example.memory.task.AgentTaskState;
 import org.example.memory.task.AgentTaskStateService;
 import org.example.service.AiOpsService;
@@ -108,7 +109,13 @@ public class ChatController {
             String systemPrompt = chatService.buildSystemPrompt(memoryContext);
             ReactAgent agent = chatService.createReactAgent(chatModel, systemPrompt);
 
-            String fullAnswer = chatService.executeChat(agent, request.getQuestion());
+            String fullAnswer;
+            MemoryUserContext.setUserId(userId);
+            try {
+                fullAnswer = chatService.executeChat(agent, request.getQuestion());
+            } finally {
+                MemoryUserContext.clear();
+            }
             saveConversationTurn(userId, sessionId, request.getQuestion(), fullAnswer);
             runPostChatMemoryPipelineAsync(userId, sessionId, request.getQuestion(), fullAnswer, chatModel);
 
@@ -174,15 +181,29 @@ public class ChatController {
                 ReactAgent agent = chatService.createReactAgent(chatModel, systemPrompt);
 
                 StringBuilder fullAnswerBuilder = new StringBuilder();
+                MemoryUserContext.setUserId(userId);
                 Flux<NodeOutput> stream = agent.stream(request.getQuestion());
 
                 stream.subscribe(
                         output -> handleStreamingOutput(output, emitter, fullAnswerBuilder),
-                        error -> handleStreamingError(error, emitter),
-                        () -> handleStreamingComplete(
-                                userId, sessionId, request.getQuestion(), fullAnswerBuilder, chatModel, emitter)
+                        error -> {
+                            try {
+                                handleStreamingError(error, emitter);
+                            } finally {
+                                MemoryUserContext.clear();
+                            }
+                        },
+                        () -> {
+                            try {
+                                handleStreamingComplete(
+                                        userId, sessionId, request.getQuestion(), fullAnswerBuilder, chatModel, emitter);
+                            } finally {
+                                MemoryUserContext.clear();
+                            }
+                        }
                 );
             } catch (Exception e) {
+                MemoryUserContext.clear();
                 logger.error("Streaming chat initialization failed", e);
                 try {
                     emitter.send(SseEmitter.event().name("message")

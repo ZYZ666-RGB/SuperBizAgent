@@ -52,6 +52,13 @@ public class GraphMemoryService {
                 memory.getUserId(), memory.getMemoryId(), entities.size());
     }
 
+    public void disableMemory(String userId, String memoryId) {
+        if (!memoryProperties.isEnabled() || !memoryProperties.getGraph().isEnabled()) {
+            return;
+        }
+        graphMemoryRepository.disableMemory(userId, memoryId);
+    }
+
     boolean shouldIndex(UserMemory memory) {
         if (!memoryProperties.isEnabled() || !memoryProperties.getGraph().isEnabled() || memory == null) {
             return false;

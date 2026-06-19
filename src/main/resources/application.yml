@@ -42,6 +42,15 @@ memory:
     username: ${NEO4J_USERNAME:neo4j}
     password: ${NEO4J_PASSWORD:neo4j1234}
     top-k: 20
+  consolidation:
+    enabled: true
+    importance-threshold: 0.7
+    max-source-memories: 5
+  forgetting:
+    enabled: true
+    max-age-days: 30
+    min-importance: 0.2
+    max-memories-per-user: 500
 
 # Spring AI Alibaba DashScope 配置
 spring:
