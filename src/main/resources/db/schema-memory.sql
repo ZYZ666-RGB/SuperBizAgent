@@ -61,3 +61,25 @@ CREATE TABLE IF NOT EXISTS user_memory (
     INDEX idx_user_enabled (user_id, enabled),
     INDEX idx_user_agent (user_id, agent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS agent_task_state (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(64) NOT NULL,
+    session_id VARCHAR(64),
+    task_id VARCHAR(64) NOT NULL,
+    agent_id VARCHAR(64) DEFAULT 'aiops_agent',
+
+    stage VARCHAR(50),
+    planner_plan TEXT,
+    executor_feedback TEXT,
+    tool_results TEXT,
+    final_report TEXT,
+    status VARCHAR(30) COMMENT 'RUNNING/FINISHED/FAILED',
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    UNIQUE KEY uk_user_task (user_id, task_id),
+    INDEX idx_user_status (user_id, status),
+    INDEX idx_user_session_task (user_id, session_id, task_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

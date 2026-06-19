@@ -2,6 +2,7 @@ package org.example.controller;
 
 import org.example.config.FileUploadConfig;
 import org.example.dto.FileUploadRes;
+import org.example.memory.EpisodicMemoryService;
 import org.example.service.VectorIndexService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,7 +20,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 public class FileUploadController {
@@ -31,8 +35,14 @@ public class FileUploadController {
     @Autowired
     private VectorIndexService vectorIndexService;
 
+    @Autowired
+    private EpisodicMemoryService episodicMemoryService;
+
     @PostMapping(value = "/api/upload", consumes = "multipart/form-data")
-    public ResponseEntity<?> upload(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+            @RequestParam(value = "sessionId", required = false) String sessionId) {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body("文件不能为空");
         }
@@ -65,6 +75,8 @@ public class FileUploadController {
             }
             
             Files.copy(file.getInputStream(), filePath);
+            String indexStatus = "SUCCESS";
+            String indexError = null;
 
             logger.info("文件上传成功: {}", filePath);
 
@@ -74,10 +86,21 @@ public class FileUploadController {
                 vectorIndexService.indexSingleFile(filePath.toString());
                 logger.info("向量索引创建成功: {}", filePath);
             } catch (Exception e) {
+                indexStatus = "FAILED";
+                indexError = e.getMessage();
                 logger.error("向量索引创建失败: {}, 错误: {}", filePath, e.getMessage(), e);
                 // 注意：即使索引失败，文件上传仍然成功，只是记录错误日志
                 // 可以根据业务需求决定是否要删除文件或返回错误
             }
+
+            saveUploadEvent(
+                    resolveUserId(headerUserId),
+                    sessionId,
+                    originalFilename,
+                    filePath,
+                    file.getSize(),
+                    indexStatus,
+                    indexError);
 
             FileUploadRes response = new FileUploadRes(
                     originalFilename,
@@ -150,5 +173,39 @@ public class FileUploadController {
         }
         List<String> allowedList = Arrays.asList(allowedExtensions.split(","));
         return allowedList.contains(extension.toLowerCase());
+    }
+
+    private void saveUploadEvent(
+            String userId,
+            String sessionId,
+            String originalFilename,
+            Path filePath,
+            long fileSize,
+            String indexStatus,
+            String indexError) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("fileName", originalFilename);
+        metadata.put("filePath", filePath.toString());
+        metadata.put("fileSize", fileSize);
+        metadata.put("indexStatus", indexStatus);
+        if (indexError != null && !indexError.isBlank()) {
+            metadata.put("indexError", indexError);
+        }
+        episodicMemoryService.saveEvent(
+                userId,
+                sessionId,
+                null,
+                "upload_agent",
+                "file_upload",
+                "User uploaded file " + originalFilename + ". Vector indexing status: " + indexStatus + ".",
+                metadata,
+                0.75);
+    }
+
+    private String resolveUserId(String headerUserId) {
+        if (headerUserId == null || headerUserId.isBlank()) {
+            return "default_user";
+        }
+        return headerUserId.trim();
     }
 }

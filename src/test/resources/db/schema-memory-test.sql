@@ -55,3 +55,23 @@ CREATE INDEX idx_user_type ON user_memory(user_id, memory_type);
 CREATE INDEX idx_user_scope ON user_memory(user_id, scope_type);
 CREATE INDEX idx_user_enabled ON user_memory(user_id, enabled);
 CREATE INDEX idx_user_agent ON user_memory(user_id, agent_id);
+
+CREATE TABLE agent_task_state (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(64) NOT NULL,
+    session_id VARCHAR(64),
+    task_id VARCHAR(64) NOT NULL,
+    agent_id VARCHAR(64) DEFAULT 'aiops_agent',
+    stage VARCHAR(50),
+    planner_plan CLOB,
+    executor_feedback CLOB,
+    tool_results CLOB,
+    final_report CLOB,
+    status VARCHAR(30),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_user_task UNIQUE (user_id, task_id)
+);
+
+CREATE INDEX idx_user_status ON agent_task_state(user_id, status);
+CREATE INDEX idx_user_session_task ON agent_task_state(user_id, session_id, task_id);

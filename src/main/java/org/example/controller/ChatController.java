@@ -13,10 +13,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
 import org.example.memory.ConversationMemoryService;
+import org.example.memory.EpisodicMemoryService;
 import org.example.memory.LongTermMemoryService;
 import org.example.memory.MemoryContextBuilder;
 import org.example.memory.MemoryPromptContext;
 import org.example.memory.SummaryMemoryService;
+import org.example.memory.task.AgentTaskState;
+import org.example.memory.task.AgentTaskStateService;
 import org.example.service.AiOpsService;
 import org.example.service.ChatService;
 import org.slf4j.Logger;
@@ -32,12 +35,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.time.ZoneId;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -67,6 +72,12 @@ public class ChatController {
 
     @Autowired
     private LongTermMemoryService longTermMemoryService;
+
+    @Autowired
+    private EpisodicMemoryService episodicMemoryService;
+
+    @Autowired
+    private AgentTaskStateService agentTaskStateService;
 
     @Autowired
     private ToolCallbackProvider tools;
@@ -187,12 +198,31 @@ public class ChatController {
     }
 
     @PostMapping(value = "/ai_ops", produces = "text/event-stream;charset=UTF-8")
-    public SseEmitter aiOps() {
+    public SseEmitter aiOps(
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+            @RequestParam(value = "sessionId", required = false) String requestSessionId,
+            @RequestParam(value = "taskId", required = false) String requestTaskId) {
         SseEmitter emitter = new SseEmitter(600000L);
+        String userId = resolveUserId(headerUserId, null);
+        String sessionId = normalizeSessionId(requestSessionId);
+        String taskId = requestTaskId == null || requestTaskId.isBlank()
+                ? UUID.randomUUID().toString()
+                : requestTaskId.trim();
 
         executor.execute(() -> {
             try {
-                logger.info("Received AI Ops request");
+                logger.info("Received AI Ops request. userId={}, sessionId={}, taskId={}",
+                        userId, sessionId, taskId);
+                agentTaskStateService.startTask(userId, sessionId, taskId, "aiops_agent", "REQUEST_RECEIVED");
+                episodicMemoryService.saveEvent(
+                        userId,
+                        sessionId,
+                        taskId,
+                        "aiops_agent",
+                        "aiops_analysis_started",
+                        "AIOps analysis task " + taskId + " started.",
+                        Map.of("stage", "REQUEST_RECEIVED"),
+                        0.7);
 
                 DashScopeApi dashScopeApi = chatService.createDashScopeApi();
                 DashScopeChatModel chatModel = DashScopeChatModel.builder()
@@ -207,10 +237,24 @@ public class ChatController {
 
                 ToolCallback[] toolCallbacks = tools.getToolCallbacks();
                 emitter.send(SseEmitter.event().name("message")
+                        .data(SseMessage.content("taskId: " + taskId + "\n"), MediaType.APPLICATION_JSON));
+                emitter.send(SseEmitter.event().name("message")
                         .data(SseMessage.content("正在读取告警并拆解任务...\n"), MediaType.APPLICATION_JSON));
 
-                Optional<OverAllState> overAllStateOptional = aiOpsService.executeAiOpsAnalysis(chatModel, toolCallbacks);
+                Optional<OverAllState> overAllStateOptional = aiOpsService.executeAiOpsAnalysis(
+                        chatModel, toolCallbacks, userId, sessionId, taskId);
                 if (overAllStateOptional.isEmpty()) {
+                    agentTaskStateService.failTask(
+                            userId, sessionId, taskId, "aiops_agent", "Supervisor returned empty state.");
+                    episodicMemoryService.saveEvent(
+                            userId,
+                            sessionId,
+                            taskId,
+                            "aiops_agent",
+                            "aiops_analysis_failed",
+                            "AIOps analysis task " + taskId + " failed because Supervisor returned empty state.",
+                            Map.of("stage", "SUPERVISOR_EMPTY_STATE"),
+                            0.75);
                     emitter.send(SseEmitter.event().name("message")
                             .data(SseMessage.error("多 Agent 编排未获取到有效结果"), MediaType.APPLICATION_JSON));
                     emitter.complete();
@@ -220,6 +264,16 @@ public class ChatController {
                 Optional<String> finalReportOptional = aiOpsService.extractFinalReport(overAllStateOptional.get());
                 if (finalReportOptional.isPresent()) {
                     String finalReportText = finalReportOptional.get();
+                    agentTaskStateService.finishTask(userId, sessionId, taskId, "aiops_agent", finalReportText);
+                    episodicMemoryService.saveEvent(
+                            userId,
+                            sessionId,
+                            taskId,
+                            "aiops_agent",
+                            "aiops_final_report_generated",
+                            "AIOps analysis task " + taskId + " generated a final report.",
+                            Map.of("stage", "FINISHED", "reportLength", finalReportText.length()),
+                            0.85);
                     emitter.send(SseEmitter.event().name("message")
                             .data(SseMessage.content("\n\n" + "=".repeat(60) + "\n"), MediaType.APPLICATION_JSON));
                     emitter.send(SseEmitter.event().name("message")
@@ -235,6 +289,17 @@ public class ChatController {
                     emitter.send(SseEmitter.event().name("message")
                             .data(SseMessage.content("\n" + "=".repeat(60) + "\n\n"), MediaType.APPLICATION_JSON));
                 } else {
+                    agentTaskStateService.failTask(
+                            userId, sessionId, taskId, "aiops_agent", "Final report was not generated.");
+                    episodicMemoryService.saveEvent(
+                            userId,
+                            sessionId,
+                            taskId,
+                            "aiops_agent",
+                            "aiops_analysis_failed",
+                            "AIOps analysis task " + taskId + " finished without a final report.",
+                            Map.of("stage", "NO_FINAL_REPORT"),
+                            0.75);
                     emitter.send(SseEmitter.event().name("message")
                             .data(SseMessage.content("多 Agent 流程已完成，但未能生成最终报告。"), MediaType.APPLICATION_JSON));
                 }
@@ -244,6 +309,16 @@ public class ChatController {
                 emitter.complete();
             } catch (Exception e) {
                 logger.error("AI Ops failed", e);
+                agentTaskStateService.failTask(userId, sessionId, taskId, "aiops_agent", e.getMessage());
+                episodicMemoryService.saveEvent(
+                        userId,
+                        sessionId,
+                        taskId,
+                        "aiops_agent",
+                        "aiops_analysis_failed",
+                        "AIOps analysis task " + taskId + " failed: " + e.getMessage(),
+                        Map.of("stage", "EXCEPTION"),
+                        0.75);
                 try {
                     emitter.send(SseEmitter.event().name("message")
                             .data(SseMessage.error("AI Ops 流程失败: " + e.getMessage()), MediaType.APPLICATION_JSON));
@@ -255,6 +330,16 @@ public class ChatController {
         });
 
         return emitter;
+    }
+
+    @GetMapping("/ai_ops/task/{taskId}")
+    public ResponseEntity<ApiResponse<AgentTaskState>> getAiOpsTaskState(
+            @PathVariable String taskId,
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId) {
+        String userId = resolveUserId(headerUserId, null);
+        return agentTaskStateService.findByUserAndTask(userId, taskId)
+                .map(state -> ResponseEntity.ok(ApiResponse.success(state)))
+                .orElseGet(() -> ResponseEntity.ok(ApiResponse.error("task not found")));
     }
 
     @GetMapping("/chat/session/{sessionId}")

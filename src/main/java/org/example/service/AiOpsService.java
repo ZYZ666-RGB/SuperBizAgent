@@ -9,6 +9,7 @@ import org.example.agent.tool.DateTimeTools;
 import org.example.agent.tool.InternalDocsTools;
 import org.example.agent.tool.QueryLogsTools;
 import org.example.agent.tool.QueryMetricsTools;
+import org.example.memory.task.AgentTaskStateService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * AI Ops 智能运维服务
@@ -40,6 +42,9 @@ public class AiOpsService {
     @Autowired(required = false)  // Mock 模式下才注册
     private QueryLogsTools queryLogsTools;
 
+    @Autowired
+    private AgentTaskStateService agentTaskStateService;
+
     /**
      * 执行 AI Ops 告警分析流程
      *
@@ -49,7 +54,22 @@ public class AiOpsService {
      * @throws GraphRunnerException 如果 Agent 执行失败
      */
     public Optional<OverAllState> executeAiOpsAnalysis(DashScopeChatModel chatModel, ToolCallback[] toolCallbacks) throws GraphRunnerException {
+        return executeAiOpsAnalysis(
+                chatModel,
+                toolCallbacks,
+                "default_user",
+                null,
+                UUID.randomUUID().toString());
+    }
+
+    public Optional<OverAllState> executeAiOpsAnalysis(
+            DashScopeChatModel chatModel,
+            ToolCallback[] toolCallbacks,
+            String userId,
+            String sessionId,
+            String taskId) throws GraphRunnerException {
         logger.info("开始执行 AI Ops 多 Agent 协作流程");
+        agentTaskStateService.startTask(userId, sessionId, taskId, "aiops_agent", "SUPERVISOR_STARTED");
 
         // 构建 Planner 和 Executor Agent
         ReactAgent plannerAgent = buildPlannerAgent(chatModel, toolCallbacks);
@@ -67,7 +87,35 @@ public class AiOpsService {
         String taskPrompt = "你是企业级 SRE，接到了自动化告警排查任务。请结合工具调用，执行**规划→执行→再规划**的闭环，并最终按照固定模板输出《告警分析报告》。禁止编造虚假数据，如连续多次查询失败需诚实反馈无法完成的原因。";
 
         logger.info("调用 Supervisor Agent 开始编排...");
-        return supervisorAgent.invoke(taskPrompt);
+        try {
+            Optional<OverAllState> result = supervisorAgent.invoke(taskPrompt);
+            if (result.isPresent()) {
+                OverAllState state = result.get();
+                agentTaskStateService.saveSnapshot(
+                        userId,
+                        sessionId,
+                        taskId,
+                        "aiops_agent",
+                        "SUPERVISOR_FINISHED",
+                        stateValueText(state, "planner_plan"),
+                        stateValueText(state, "executor_feedback"),
+                        null);
+            } else {
+                agentTaskStateService.failTask(
+                        userId,
+                        sessionId,
+                        taskId,
+                        "aiops_agent",
+                        "Supervisor returned empty state.");
+            }
+            return result;
+        } catch (GraphRunnerException e) {
+            agentTaskStateService.failTask(userId, sessionId, taskId, "aiops_agent", e.getMessage());
+            throw e;
+        } catch (RuntimeException e) {
+            agentTaskStateService.failTask(userId, sessionId, taskId, "aiops_agent", e.getMessage());
+            throw e;
+        }
     }
 
     /**
@@ -92,6 +140,17 @@ public class AiOpsService {
             logger.warn("未能提取到 Planner 最终报告");
             return Optional.empty();
         }
+    }
+
+    private String stateValueText(OverAllState state, String key) {
+        return state.value(key)
+                .map(value -> {
+                    if (value instanceof AssistantMessage message) {
+                        return message.getText();
+                    }
+                    return value.toString();
+                })
+                .orElse(null);
     }
 
     /**
