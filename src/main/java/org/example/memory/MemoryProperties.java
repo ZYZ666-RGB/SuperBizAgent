@@ -13,6 +13,7 @@ public class MemoryProperties {
     private int summaryThreshold = 12;
     private LongTerm longTerm = new LongTerm();
     private Vector vector = new Vector();
+    private Graph graph = new Graph();
 
     public boolean isEnabled() {
         return enabled;
@@ -64,6 +65,14 @@ public class MemoryProperties {
 
     public void setVector(Vector vector) {
         this.vector = vector;
+    }
+
+    public Graph getGraph() {
+        return graph;
+    }
+
+    public void setGraph(Graph graph) {
+        this.graph = graph;
     }
 
     public static class LongTerm {
@@ -159,6 +168,54 @@ public class MemoryProperties {
 
         public void setDimension(int dimension) {
             this.dimension = dimension;
+        }
+    }
+
+    public static class Graph {
+        private boolean enabled = true;
+        private String neo4jUri = "bolt://localhost:7687";
+        private String username = "neo4j";
+        private String password = "neo4j1234";
+        private int topK = 20;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getNeo4jUri() {
+            return neo4jUri;
+        }
+
+        public void setNeo4jUri(String neo4jUri) {
+            this.neo4jUri = neo4jUri;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+
+        public int getTopK() {
+            return topK;
+        }
+
+        public void setTopK(int topK) {
+            this.topK = topK;
         }
     }
 }

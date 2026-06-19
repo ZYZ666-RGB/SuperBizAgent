@@ -23,11 +23,13 @@ class ChatServiceMemoryPromptTest {
         UserMemory longTermMemory = new UserMemory();
         longTermMemory.setContent("long-term preference memory");
         context.setSemanticMemories(List.of(longTermMemory));
+        context.setGraphRelations(List.of("SuperBizAgent -[USES]- Milvus"));
 
         String prompt = chatService.buildSystemPrompt(context);
 
         assertThat(prompt).contains("SuperBizAgent");
         assertThat(prompt).contains("long-term preference memory");
+        assertThat(prompt).contains("SuperBizAgent -[USES]- Milvus");
         assertThat(prompt).contains("stable project summary");
         assertThat(prompt).contains("question from recent memory");
         assertThat(prompt).contains("answer from recent memory");

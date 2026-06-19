@@ -152,6 +152,16 @@ public class ChatService {
             systemPromptBuilder.append("\n");
         }
 
+        if (memoryContext != null && !memoryContext.getGraphRelations().isEmpty()) {
+            systemPromptBuilder.append("【图谱关系记忆】\n");
+            for (String relation : memoryContext.getGraphRelations()) {
+                systemPromptBuilder.append("- ")
+                        .append(relation)
+                        .append("\n");
+            }
+            systemPromptBuilder.append("\n");
+        }
+
         if (memoryContext != null && hasText(memoryContext.getSessionSummary())) {
             systemPromptBuilder.append("【当前会话摘要】\n");
             systemPromptBuilder.append(memoryContext.getSessionSummary()).append("\n\n");

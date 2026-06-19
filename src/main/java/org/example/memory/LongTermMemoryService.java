@@ -2,8 +2,11 @@ package org.example.memory;
 
 import com.alibaba.cloud.ai.dashscope.chat.DashScopeChatModel;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.memory.graph.GraphMemoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,6 +24,7 @@ public class LongTermMemoryService {
     private final MemoryAdmissionService memoryAdmissionService;
     private final MemoryDedupService memoryDedupService;
     private final MemoryVectorService memoryVectorService;
+    private final GraphMemoryService graphMemoryService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public LongTermMemoryService(
@@ -30,12 +34,38 @@ public class LongTermMemoryService {
             MemoryAdmissionService memoryAdmissionService,
             MemoryDedupService memoryDedupService,
             MemoryVectorService memoryVectorService) {
+        this(memoryProperties, userMemoryRepository, memoryExtractorService, memoryAdmissionService,
+                memoryDedupService, memoryVectorService, (GraphMemoryService) null);
+    }
+
+    @Autowired
+    public LongTermMemoryService(
+            MemoryProperties memoryProperties,
+            UserMemoryRepository userMemoryRepository,
+            MemoryExtractorService memoryExtractorService,
+            MemoryAdmissionService memoryAdmissionService,
+            MemoryDedupService memoryDedupService,
+            MemoryVectorService memoryVectorService,
+            ObjectProvider<GraphMemoryService> graphMemoryServiceProvider) {
+        this(memoryProperties, userMemoryRepository, memoryExtractorService, memoryAdmissionService,
+                memoryDedupService, memoryVectorService, graphMemoryServiceProvider.getIfAvailable());
+    }
+
+    private LongTermMemoryService(
+            MemoryProperties memoryProperties,
+            UserMemoryRepository userMemoryRepository,
+            MemoryExtractorService memoryExtractorService,
+            MemoryAdmissionService memoryAdmissionService,
+            MemoryDedupService memoryDedupService,
+            MemoryVectorService memoryVectorService,
+            GraphMemoryService graphMemoryService) {
         this.memoryProperties = memoryProperties;
         this.userMemoryRepository = userMemoryRepository;
         this.memoryExtractorService = memoryExtractorService;
         this.memoryAdmissionService = memoryAdmissionService;
         this.memoryDedupService = memoryDedupService;
         this.memoryVectorService = memoryVectorService;
+        this.graphMemoryService = graphMemoryService;
     }
 
     public List<UserMemory> getSemanticMemoriesForPrompt(String userId, String query) {
@@ -108,6 +138,14 @@ public class LongTermMemoryService {
             memoryVectorService.indexMemory(memory);
         } catch (Exception e) {
             logger.warn("Failed to index long-term memory vector. memoryId={}, error={}",
+                    memory.getMemoryId(), e.getMessage());
+        }
+        try {
+            if (graphMemoryService != null) {
+                graphMemoryService.indexMemory(memory);
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to index graph memory. memoryId={}, error={}",
                     memory.getMemoryId(), e.getMessage());
         }
         logger.info("Saved long-term memory. userId={}, sessionId={}, type={}, memoryId={}",

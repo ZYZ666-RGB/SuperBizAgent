@@ -11,6 +11,7 @@ public class MemoryPromptContext {
     private List<ChatMessageDTO> recentMessages = new ArrayList<>();
     private List<UserMemory> semanticMemories = new ArrayList<>();
     private List<UserMemory> episodicMemories = new ArrayList<>();
+    private List<String> graphRelations = new ArrayList<>();
 
     public String getSessionSummary() {
         return sessionSummary;
@@ -42,5 +43,13 @@ public class MemoryPromptContext {
 
     public void setEpisodicMemories(List<UserMemory> episodicMemories) {
         this.episodicMemories = episodicMemories == null ? new ArrayList<>() : episodicMemories;
+    }
+
+    public List<String> getGraphRelations() {
+        return graphRelations;
+    }
+
+    public void setGraphRelations(List<String> graphRelations) {
+        this.graphRelations = graphRelations == null ? new ArrayList<>() : graphRelations;
     }
 }

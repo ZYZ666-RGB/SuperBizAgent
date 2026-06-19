@@ -36,6 +36,12 @@ memory:
     enabled: true
     collection-name: user_memory
     dimension: 1024
+  graph:
+    enabled: true
+    neo4j-uri: ${NEO4J_URI:bolt://localhost:7687}
+    username: ${NEO4J_USERNAME:neo4j}
+    password: ${NEO4J_PASSWORD:neo4j1234}
+    top-k: 20
 
 # Spring AI Alibaba DashScope 配置
 spring:

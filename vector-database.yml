@@ -85,6 +85,20 @@ services:
       MILVUS_URL: standalone:19530
     depends_on:
       - standalone # 确保 Milvus 启动后再启动 Attu
+  neo4j:
+    image: neo4j:5.26
+    container_name: neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-neo4j1234}
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - ./volumes/neo4j/data:/data
+      - ./volumes/neo4j/logs:/logs
+      - ./volumes/neo4j/plugins:/plugins
+
 networks:
   default:
     name: milvus
