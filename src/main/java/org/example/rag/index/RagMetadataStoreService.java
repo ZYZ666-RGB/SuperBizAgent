@@ -13,6 +13,7 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.StringJoiner;
 
 @Service
 public class RagMetadataStoreService {
@@ -171,6 +172,75 @@ public class RagMetadataStoreService {
                 "SELECT * FROM rag_chunk WHERE document_id = ? ORDER BY chunk_index ASC, id ASC",
                 chunkRowMapper,
                 documentId);
+    }
+
+    public Optional<RagChunk> findChunkById(String chunkId) {
+        List<RagChunk> chunks = jdbcTemplate.query(
+                "SELECT * FROM rag_chunk WHERE chunk_id = ? LIMIT 1",
+                chunkRowMapper,
+                chunkId);
+        return chunks.isEmpty() ? Optional.empty() : Optional.of(chunks.get(0));
+    }
+
+    public List<RagChunk> findChunksByIds(List<String> chunkIds) {
+        if (chunkIds == null || chunkIds.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(chunkIds.size(), "?"));
+        String sql = "SELECT * FROM rag_chunk WHERE chunk_id IN (" + placeholders + ")";
+        return jdbcTemplate.query(sql, chunkRowMapper, chunkIds.toArray());
+    }
+
+    public Optional<RagChunk> findParentChunk(String parentChunkId) {
+        if (parentChunkId == null || parentChunkId.isBlank()) {
+            return Optional.empty();
+        }
+        return findChunkById(parentChunkId);
+    }
+
+    public List<RagChunk> searchChunks(
+            String namespace,
+            List<String> keywords,
+            java.util.Map<String, Object> filters,
+            int limit) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT *
+                FROM rag_chunk
+                WHERE (? IS NULL OR namespace = ?)
+                  AND (chunk_index IS NULL OR chunk_index >= 0)
+                """);
+        java.util.List<Object> args = new java.util.ArrayList<>();
+        String normalizedNamespace = namespace == null || namespace.isBlank() ? null : namespace;
+        args.add(normalizedNamespace);
+        args.add(normalizedNamespace);
+
+        if (keywords != null && !keywords.isEmpty()) {
+            StringJoiner keywordClause = new StringJoiner(" OR ", " AND (", ")");
+            for (String keyword : keywords) {
+                if (keyword == null || keyword.isBlank()) {
+                    continue;
+                }
+                keywordClause.add("LOWER(content) LIKE ?");
+                args.add("%" + keyword.toLowerCase() + "%");
+            }
+            if (keywordClause.length() > 7) {
+                sql.append(keywordClause);
+            }
+        }
+
+        if (filters != null && !filters.isEmpty()) {
+            for (java.util.Map.Entry<String, Object> entry : filters.entrySet()) {
+                if (entry.getValue() == null || entry.getValue().toString().isBlank()) {
+                    continue;
+                }
+                sql.append(" AND metadata_json LIKE ?");
+                args.add("%\"" + entry.getKey() + "\":%" + entry.getValue() + "%");
+            }
+        }
+
+        sql.append(" ORDER BY chunk_index ASC, id ASC LIMIT ?");
+        args.add(Math.max(1, limit));
+        return jdbcTemplate.query(sql.toString(), chunkRowMapper, args.toArray());
     }
 
     public void deleteDocument(String documentId) {

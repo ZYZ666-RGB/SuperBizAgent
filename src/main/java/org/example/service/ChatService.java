@@ -13,6 +13,7 @@ import org.example.agent.tool.QueryMetricsTools;
 import org.example.memory.MemoryPromptContext;
 import org.example.memory.UserMemory;
 import org.example.memory.dto.ChatMessageDTO;
+import org.example.rag.online.tool.AdvancedRagTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
@@ -35,6 +36,9 @@ public class ChatService {
 
     @Autowired
     private InternalDocsTools internalDocsTools;
+
+    @Autowired
+    private AdvancedRagTools advancedRagTools;
 
     @Autowired
     private DateTimeTools dateTimeTools;
@@ -100,6 +104,7 @@ public class ChatService {
         systemPromptBuilder.append("你是一个专业的智能助手，可以获取当前时间、查询天气信息、搜索内部文档知识库，以及查询 Prometheus 告警信息。\n");
         systemPromptBuilder.append("当用户询问时间相关问题时，使用 getCurrentDateTime 工具。\n");
         systemPromptBuilder.append("当用户需要查询公司内部文档、流程、最佳实践或技术指南时，使用 queryInternalDocs 工具。\n");
+        systemPromptBuilder.append("当用户询问内部文档、运维手册、错误码、异常排查、组件配置或服务依赖时，优先使用 advancedRagSearch 工具，它会返回证据和引用。\n");
         systemPromptBuilder.append("当用户需要查询 Prometheus 告警、监控指标或系统告警状态时，使用 queryPrometheusAlerts 工具。\n");
         systemPromptBuilder.append("当用户需要查询腾讯云日志时，请调用腾讯云mcp服务查询,默认查询地域ap-guangzhou,查询时间范围为近一个月。\n\n");
         
@@ -133,6 +138,7 @@ public class ChatService {
         systemPromptBuilder.append("你是 SuperBizAgent 智能助手，请结合记忆上下文、业务知识库和可用工具回答用户问题。\n");
         systemPromptBuilder.append("当用户询问时间相关问题时，使用 getCurrentDateTime 工具。\n");
         systemPromptBuilder.append("当用户需要查询公司内部文档、流程、最佳实践或技术指南时，使用 queryInternalDocs 工具。\n");
+        systemPromptBuilder.append("当用户询问内部文档、运维手册、错误码、异常排查、组件配置或服务依赖时，优先使用 advancedRagSearch 工具，它会返回证据和引用。\n");
         systemPromptBuilder.append("当用户需要查询 Prometheus 告警、监控指标或系统告警状态时，使用 queryPrometheusAlerts 工具。\n");
         systemPromptBuilder.append("当用户需要查询腾讯云日志时，请调用腾讯云 MCP 服务查询，默认查询区域 ap-guangzhou，查询时间范围为近一个月。\n\n");
 
@@ -211,10 +217,10 @@ public class ChatService {
     public Object[] buildMethodToolsArray() {
         if (queryLogsTools != null) {
             // Mock 模式：包含 QueryLogsTools
-            return new Object[]{dateTimeTools, internalDocsTools, queryMetricsTools, queryLogsTools, memoryTools};
+            return new Object[]{dateTimeTools, internalDocsTools, advancedRagTools, queryMetricsTools, queryLogsTools, memoryTools};
         } else {
             // 真实模式：不包含 QueryLogsTools（由 MCP 提供日志查询功能）
-            return new Object[]{dateTimeTools, internalDocsTools, queryMetricsTools, memoryTools};
+            return new Object[]{dateTimeTools, internalDocsTools, advancedRagTools, queryMetricsTools, memoryTools};
         }
     }
 

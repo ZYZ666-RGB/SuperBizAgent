@@ -133,6 +133,40 @@ rag:
   index:
     vector-store: milvus
     delete-old-before-reindex: true
+  online:
+    default-namespace: default
+    query:
+      enable-analysis: true
+      enable-rewrite: true
+      rewrite-count: 3
+      enable-hyde: false
+    retrieve:
+      enable-dense: true
+      enable-sparse: true
+      enable-hybrid: true
+      dense-top-k: 20
+      sparse-top-k: 20
+      candidate-pool-size: 40
+      final-top-k: 6
+    fusion:
+      type: rrf
+      rrf-k: 60
+    rerank:
+      enabled: true
+      provider: noop
+      model: gte-rerank-v2
+      timeout-seconds: 30
+      fallback-to-fusion: true
+    context:
+      max-context-tokens: 4000
+      enable-compression: true
+      enable-parent-expansion: true
+    verify:
+      enabled: true
+      min-confidence: 0.55
+      require-citation: true
+    debug:
+      enable-trace: true
 
 # Prometheus 配置
 prometheus:
