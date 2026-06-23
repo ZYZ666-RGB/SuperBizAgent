@@ -52,6 +52,23 @@ memory:
     min-importance: 0.2
     max-memories-per-user: 500
 
+context:
+  engineering:
+    max-tokens: 6000
+    reserved-output-tokens: 1200
+    max-history-tokens: 1000
+    max-memory-tokens: 1200
+    max-rag-tokens: 2500
+    max-tool-result-tokens: 1000
+    min-relevance: 0.2
+    relevance-weight: 0.65
+    recency-weight: 0.2
+    importance-weight: 0.15
+    enable-compression: true
+    recent-rounds: 6
+    memory-top-k: 8
+    rag-top-k: 6
+
 # Spring AI Alibaba DashScope 配置
 spring:
   datasource:
