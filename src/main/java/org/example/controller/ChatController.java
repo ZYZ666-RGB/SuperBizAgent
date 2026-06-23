@@ -12,12 +12,11 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 import lombok.Setter;
+import org.example.context.ContextBuildResult;
+import org.example.context.ContextEngineeringService;
+import org.example.context.ContextPostProcessor;
 import org.example.memory.ConversationMemoryService;
 import org.example.memory.EpisodicMemoryService;
-import org.example.memory.LongTermMemoryService;
-import org.example.memory.MemoryContextBuilder;
-import org.example.memory.MemoryPromptContext;
-import org.example.memory.SummaryMemoryService;
 import org.example.memory.MemoryUserContext;
 import org.example.memory.task.AgentTaskState;
 import org.example.memory.task.AgentTaskStateService;
@@ -66,13 +65,10 @@ public class ChatController {
     private ConversationMemoryService conversationMemoryService;
 
     @Autowired
-    private MemoryContextBuilder memoryContextBuilder;
+    private ContextEngineeringService contextEngineeringService;
 
     @Autowired
-    private SummaryMemoryService summaryMemoryService;
-
-    @Autowired
-    private LongTermMemoryService longTermMemoryService;
+    private ContextPostProcessor contextPostProcessor;
 
     @Autowired
     private EpisodicMemoryService episodicMemoryService;
@@ -104,9 +100,9 @@ public class ChatController {
             DashScopeChatModel chatModel = chatService.createStandardChatModel(dashScopeApi);
             chatService.logAvailableTools();
 
-            MemoryPromptContext memoryContext = memoryContextBuilder.buildForChat(
+            ContextBuildResult contextResult = contextEngineeringService.buildForChat(
                     userId, sessionId, request.getQuestion());
-            String systemPrompt = chatService.buildSystemPrompt(memoryContext);
+            String systemPrompt = contextResult.getFinalContext();
             ReactAgent agent = chatService.createReactAgent(chatModel, systemPrompt);
 
             String fullAnswer;
@@ -175,9 +171,9 @@ public class ChatController {
                 DashScopeChatModel chatModel = chatService.createStandardChatModel(dashScopeApi);
                 chatService.logAvailableTools();
 
-                MemoryPromptContext memoryContext = memoryContextBuilder.buildForChat(
+                ContextBuildResult contextResult = contextEngineeringService.buildForChat(
                         userId, sessionId, request.getQuestion());
-                String systemPrompt = chatService.buildSystemPrompt(memoryContext);
+                String systemPrompt = contextResult.getFinalContext();
                 ReactAgent agent = chatService.createReactAgent(chatModel, systemPrompt);
 
                 StringBuilder fullAnswerBuilder = new StringBuilder();
@@ -453,8 +449,7 @@ public class ChatController {
             String answer,
             DashScopeChatModel chatModel) {
         executor.execute(() -> {
-            summaryMemoryService.refreshSummaryIfNeeded(userId, sessionId, chatModel);
-            longTermMemoryService.extractAndSaveAfterChat(userId, sessionId, question, answer, chatModel);
+            contextPostProcessor.afterChat(userId, sessionId, question, answer, chatModel);
         });
     }
 

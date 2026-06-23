@@ -9,6 +9,9 @@ import org.example.agent.tool.DateTimeTools;
 import org.example.agent.tool.InternalDocsTools;
 import org.example.agent.tool.QueryLogsTools;
 import org.example.agent.tool.QueryMetricsTools;
+import org.example.context.AiOpsContext;
+import org.example.context.ContextBuildRequest;
+import org.example.context.ContextEngineeringService;
 import org.example.memory.task.AgentTaskStateService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +48,9 @@ public class AiOpsService {
     @Autowired
     private AgentTaskStateService agentTaskStateService;
 
+    @Autowired
+    private ContextEngineeringService contextEngineeringService;
+
     /**
      * 执行 AI Ops 告警分析流程
      *
@@ -70,21 +76,23 @@ public class AiOpsService {
             String taskId) throws GraphRunnerException {
         logger.info("开始执行 AI Ops 多 Agent 协作流程");
         agentTaskStateService.startTask(userId, sessionId, taskId, "aiops_agent", "SUPERVISOR_STARTED");
+        String taskPrompt = "你是企业级 SRE，接到了自动化告警排查任务。请结合工具调用，执行**规划→执行→再规划**的闭环，并最终按照固定模板输出《告警分析报告》。禁止编造虚假数据，如连续多次查询失败需诚实反馈无法完成的原因。";
 
         // 构建 Planner 和 Executor Agent
-        ReactAgent plannerAgent = buildPlannerAgent(chatModel, toolCallbacks);
-        ReactAgent executorAgent = buildExecutorAgent(chatModel, toolCallbacks);
+        ReactAgent plannerAgent = buildPlannerAgent(chatModel, toolCallbacks, userId, sessionId, taskId, taskPrompt);
+        ReactAgent executorAgent = buildExecutorAgent(chatModel, toolCallbacks, userId, sessionId, taskId, taskPrompt);
 
         // 构建 Supervisor Agent
         SupervisorAgent supervisorAgent = SupervisorAgent.builder()
                 .name("ai_ops_supervisor")
                 .description("负责调度 Planner 与 Executor 的多 Agent 控制器")
                 .model(chatModel)
-                .systemPrompt(buildSupervisorSystemPrompt())
+                .systemPrompt(buildAiOpsSystemPrompt(
+                        userId, sessionId, taskId, "ai_ops_supervisor", taskPrompt,
+                        ContextBuildRequest.Scenario.AIOPS_REPLANNER)
+                        + "\n\n" + buildSupervisorSystemPrompt())
                 .subAgents(List.of(plannerAgent, executorAgent))
                 .build();
-
-        String taskPrompt = "你是企业级 SRE，接到了自动化告警排查任务。请结合工具调用，执行**规划→执行→再规划**的闭环，并最终按照固定模板输出《告警分析报告》。禁止编造虚假数据，如连续多次查询失败需诚实反馈无法完成的原因。";
 
         logger.info("调用 Supervisor Agent 开始编排...");
         try {
@@ -156,12 +164,21 @@ public class AiOpsService {
     /**
      * 构建 Planner Agent
      */
-    private ReactAgent buildPlannerAgent(DashScopeChatModel chatModel, ToolCallback[] toolCallbacks) {
+    private ReactAgent buildPlannerAgent(
+            DashScopeChatModel chatModel,
+            ToolCallback[] toolCallbacks,
+            String userId,
+            String sessionId,
+            String taskId,
+            String taskPrompt) {
         return ReactAgent.builder()
                 .name("planner_agent")
                 .description("负责拆解告警、规划与再规划步骤")
                 .model(chatModel)
-                .systemPrompt(buildPlannerPrompt())
+                .systemPrompt(buildAiOpsSystemPrompt(
+                        userId, sessionId, taskId, "planner_agent", taskPrompt,
+                        ContextBuildRequest.Scenario.AIOPS_PLANNER)
+                        + "\n\n" + buildPlannerPrompt())
                 .methodTools(buildMethodToolsArray())
                 .tools(toolCallbacks)
                 .outputKey("planner_plan")
@@ -171,16 +188,42 @@ public class AiOpsService {
     /**
      * 构建 Executor Agent
      */
-    private ReactAgent buildExecutorAgent(DashScopeChatModel chatModel, ToolCallback[] toolCallbacks) {
+    private ReactAgent buildExecutorAgent(
+            DashScopeChatModel chatModel,
+            ToolCallback[] toolCallbacks,
+            String userId,
+            String sessionId,
+            String taskId,
+            String taskPrompt) {
         return ReactAgent.builder()
                 .name("executor_agent")
                 .description("负责执行 Planner 的首个步骤并及时反馈")
                 .model(chatModel)
-                .systemPrompt(buildExecutorPrompt())
+                .systemPrompt(buildAiOpsSystemPrompt(
+                        userId, sessionId, taskId, "executor_agent", taskPrompt,
+                        ContextBuildRequest.Scenario.AIOPS_EXECUTOR)
+                        + "\n\n" + buildExecutorPrompt())
                 .methodTools(buildMethodToolsArray())
                 .tools(toolCallbacks)
                 .outputKey("executor_feedback")
                 .build();
+    }
+
+    private String buildAiOpsSystemPrompt(
+            String userId,
+            String sessionId,
+            String taskId,
+            String agentId,
+            String taskPrompt,
+            ContextBuildRequest.Scenario scenario) {
+        AiOpsContext aiOpsContext = new AiOpsContext();
+        aiOpsContext.setUserId(userId);
+        aiOpsContext.setSessionId(sessionId);
+        aiOpsContext.setTaskId(taskId);
+        aiOpsContext.setAgentId(agentId);
+        aiOpsContext.setTaskDescription(taskPrompt);
+        aiOpsContext.setCurrentStep(taskPrompt);
+        return contextEngineeringService.buildForAiOps(aiOpsContext, scenario).getFinalContext();
     }
 
     /**
