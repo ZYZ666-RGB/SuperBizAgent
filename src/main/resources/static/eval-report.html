@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperBizAgent 评测报告</title>
+    <style>
+        :root {
+            --bg: #f6f7fb;
+            --surface: #ffffff;
+            --surface-soft: #eef2f7;
+            --text: #1f2937;
+            --muted: #64748b;
+            --line: #d8dee9;
+            --blue: #2563eb;
+            --green: #059669;
+            --amber: #d97706;
+            --red: #dc2626;
+            --ink: #111827;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        .shell {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 14px 22px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--line);
+        }
+
+        .brand {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .brand h1 {
+            margin: 0;
+            color: var(--ink);
+            font-size: 18px;
+            line-height: 1.25;
+        }
+
+        .brand span {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .field {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .field input[type="text"] {
+            width: 260px;
+            height: 34px;
+            padding: 0 10px;
+            color: var(--text);
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 6px;
+        }
+
+        .field input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--blue);
+        }
+
+        .btn {
+            height: 34px;
+            padding: 0 14px;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .btn.primary {
+            border-color: var(--blue);
+            background: var(--blue);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        main {
+            width: min(1240px, calc(100vw - 32px));
+            margin: 18px auto 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .summary-band {
+            display: grid;
+            grid-template-columns: 1.2fr repeat(4, minmax(140px, 1fr));
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .summary-copy,
+        .metric,
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+        }
+
+        .summary-copy {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .summary-copy h2 {
+            margin: 0;
+            color: var(--ink);
+            font-size: 16px;
+        }
+
+        .summary-copy p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .metric {
+            min-height: 96px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .metric-label {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .metric-value {
+            color: var(--ink);
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .metric-sub {
+            color: var(--muted);
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+            gap: 16px;
+        }
+
+        .panel {
+            overflow: hidden;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--line);
+            background: #fbfcfe;
+        }
+
+        .panel-title {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .panel-title h2 {
+            margin: 0;
+            color: var(--ink);
+            font-size: 15px;
+        }
+
+        .panel-title span {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .panel-body {
+            padding: 14px 16px 16px;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 72px;
+            height: 26px;
+            padding: 0 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid;
+        }
+
+        .status.PASS {
+            color: var(--green);
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+        }
+
+        .status.WARN {
+            color: var(--amber);
+            background: #fffbeb;
+            border-color: #fde68a;
+        }
+
+        .status.FAIL {
+            color: var(--red);
+            background: #fef2f2;
+            border-color: #fecaca;
+        }
+
+        .status.SKIPPED {
+            color: var(--muted);
+            background: var(--surface-soft);
+            border-color: var(--line);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th,
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 600;
+            background: #fbfcfe;
+        }
+
+        tr:last-child td {
+            border-bottom: 0;
+        }
+
+        .scorebar {
+            width: 100%;
+            min-width: 120px;
+            height: 8px;
+            background: var(--surface-soft);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .scorebar span {
+            display: block;
+            height: 100%;
+            background: var(--blue);
+        }
+
+        .case-list,
+        .check-list,
+        .recommendations {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .case-row,
+        .check-row,
+        .recommendations li {
+            padding: 10px 12px;
+            background: #fbfcfe;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+        }
+
+        .case-head,
+        .check-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .case-title,
+        .check-title {
+            color: var(--ink);
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        .text-muted {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.55;
+        }
+
+        .mono {
+            font-family: "JetBrains Mono", "Consolas", monospace;
+            font-size: 12px;
+        }
+
+        .kv {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 8px 12px;
+            font-size: 13px;
+        }
+
+        .kv div:nth-child(odd) {
+            color: var(--muted);
+        }
+
+        .recommendations {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .empty {
+            color: var(--muted);
+            font-size: 13px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .error {
+            color: var(--red);
+            white-space: pre-wrap;
+        }
+
+        @media (max-width: 980px) {
+            .topbar {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .actions {
+                justify-content: flex-start;
+                width: 100%;
+            }
+
+            .field input[type="text"] {
+                width: min(420px, calc(100vw - 140px));
+            }
+
+            .summary-band,
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <header class="topbar">
+        <div class="brand">
+            <h1>SuperBizAgent 评测报告</h1>
+            <span>模型对比、检索增强有效性、长期记忆有效性和离线质量门槛</span>
+        </div>
+        <div class="actions">
+            <label class="field">
+                命名空间
+                <input id="namespaceInput" type="text" value="eval_report">
+            </label>
+            <label class="field">
+                模型
+                <input id="modelsInput" type="text" value="deepseek-v4-flash,qwen-plus,qwen-turbo">
+            </label>
+            <label class="field">
+                <input id="seedInput" type="checkbox" checked>
+                写入演示检索文档
+            </label>
+            <button class="btn" id="refreshBtn">刷新最新数据</button>
+            <button class="btn primary" id="runBtn">主动运行在线评测</button>
+        </div>
+    </header>
+
+    <main>
+        <section class="summary-band">
+            <div class="summary-copy">
+                <h2 id="summaryTitle">等待加载报告</h2>
+                <p id="summaryText">如果还没有运行过评测，这里会先展示只读快照。</p>
+                <p class="text-muted" id="generatedAt"></p>
+            </div>
+            <div class="metric">
+                <div class="metric-label">总体状态</div>
+                <div id="overallStatus"></div>
+                <div class="metric-sub">通过 / 警告 / 失败</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">总体分数</div>
+                <div class="metric-value" id="overallScore">--</div>
+                <div class="scorebar"><span id="overallBar" style="width:0"></span></div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">RAG 文档 / 分片</div>
+                <div class="metric-value" id="ragCounts">--</div>
+                <div class="metric-sub">来自 MySQL 元数据</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">记忆数量</div>
+                <div class="metric-value" id="memoryCount">--</div>
+                <div class="metric-sub">已启用的长期记忆</div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <h2>不同大模型作为大语言模型的表现</h2>
+                    <span>真实调用配置的 DashScope 模型，用运维关键点覆盖、回答克制性和风险措辞做轻量评分</span>
+                </div>
+            </div>
+            <div class="panel-body" id="modelPanel"></div>
+        </section>
+
+        <div class="grid">
+            <section class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <h2>检索增强有效性</h2>
+                        <span>看能否入库、召回证据、输出引用、避免无依据强答</span>
+                    </div>
+                    <div id="ragStatus"></div>
+                </div>
+                <div class="panel-body" id="ragPanel"></div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <h2>记忆有效性</h2>
+                        <span>看能否写入、同用户检索、跨用户隔离，并真实进入最终上下文</span>
+                    </div>
+                    <div id="memoryStatus"></div>
+                </div>
+                <div class="panel-body" id="memoryPanel"></div>
+            </section>
+        </div>
+
+        <div class="grid">
+            <section class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <h2>离线评测门槛</h2>
+                        <span>读取最近一次离线评测测试报告</span>
+                    </div>
+                    <div id="qualityStatus"></div>
+                </div>
+                <div class="panel-body" id="qualityPanel"></div>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <h2>建议</h2>
+                        <span>根据当前报告自动生成下一步检查点</span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <ul class="recommendations" id="recommendations"></ul>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+
+<script>
+    const $ = (id) => document.getElementById(id);
+    const STATUS_TEXT = {
+        PASS: '通过',
+        WARN: '警告',
+        FAIL: '失败',
+        SKIPPED: '未运行'
+    };
+    const CASE_TEXT = {
+        'rag-answerable': '可回答问题',
+        'rag-refusal': '无依据问题'
+    };
+
+    function statusBadge(status) {
+        const value = status || 'SKIPPED';
+        return `<span class="status ${escapeHtml(value)}">${escapeHtml(STATUS_TEXT[value] || value)}</span>`;
+    }
+
+    function pct(value) {
+        const number = Number(value || 0);
+        return Math.round(number * 100) + '%';
+    }
+
+    function scoreBar(value) {
+        const width = Math.max(0, Math.min(100, Math.round(Number(value || 0) * 100)));
+        return `<div class="scorebar"><span style="width:${width}%"></span></div>`;
+    }
+
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = value == null ? '' : String(value);
+        return div.innerHTML;
+    }
+
+    function formatBool(value) {
+        if (value === true) {
+            return '是';
+        }
+        if (value === false) {
+            return '否';
+        }
+        return '未知';
+    }
+
+    function formatCaseName(caseId) {
+        return CASE_TEXT[caseId] || caseId || '未命名案例';
+    }
+
+    function formatEvidence(value) {
+        if (!value) {
+            return '';
+        }
+        return String(value)
+            .replaceAll('namespace=', '命名空间=')
+            .replaceAll('documents=', '文档数=')
+            .replaceAll('chunks=', '分片数=')
+            .replaceAll('usedChunks=', '召回分片数=')
+            .replaceAll('citations=', '引用数=')
+            .replaceAll('supported=', '有证据支撑=')
+            .replaceAll('confidence=', '置信度=')
+            .replaceAll('score=', '分数=')
+            .replaceAll('length=', '长度=')
+            .replaceAll('max=', '上限=')
+            .replaceAll('memoryId=', '记忆 ID=')
+            .replaceAll('queryMarker=', '查询标记=')
+            .replaceAll('otherUserResults=', '其他用户命中数=')
+            .replaceAll('selectedPackets=', '选中上下文片段=')
+            .replaceAll('droppedPackets=', '丢弃上下文片段=');
+    }
+
+    function hasRagCase(item) {
+        return Boolean(item && (item.caseId || item.query || item.status || item.answerPreview));
+    }
+
+    function renderReport(report) {
+        $('summaryTitle').textContent = report.mode === 'live' ? '最近一次主动在线评测' : '当前最新快照';
+        $('summaryText').textContent = report.summary || '暂无摘要。';
+        const times = [];
+        if (report.generatedAt) {
+            times.push(`评测生成：${new Date(report.generatedAt).toLocaleString()}`);
+        }
+        if (report.refreshedAt) {
+            times.push(`数据刷新：${new Date(report.refreshedAt).toLocaleString()}`);
+        }
+        $('generatedAt').textContent = times.join(' · ');
+        $('overallStatus').innerHTML = statusBadge(report.overallStatus);
+        $('overallScore').textContent = pct(report.overallScore);
+        $('overallBar').style.width = pct(report.overallScore);
+
+        const env = report.environment || {};
+        $('ragCounts').textContent = `${env.ragDocumentCount || 0} / ${env.ragChunkCount || 0}`;
+        $('memoryCount').textContent = env.enabledMemoryCount || 0;
+
+        renderModels(report.modelEvaluations || []);
+        renderRag(report.ragEvaluation || {});
+        renderMemory(report.memoryEvaluation || {});
+        renderQuality(report.qualityGate || {});
+        renderRecommendations(report.recommendations || []);
+    }
+
+    function renderModels(models) {
+        if (!models.length) {
+            $('modelPanel').innerHTML = '<div class="empty">暂无模型评测。点击“主动运行在线评测”开始。</div>';
+            return;
+        }
+        $('modelPanel').innerHTML = `
+            <table>
+                <thead>
+                <tr>
+                    <th>模型</th>
+                    <th>状态</th>
+                    <th>分数</th>
+                    <th>耗时</th>
+                    <th>回答预览 / 错误</th>
+                    <th>检查项</th>
+                </tr>
+                </thead>
+                <tbody>
+                ${models.map(model => `
+                    <tr>
+                        <td class="mono">${escapeHtml(model.model)}</td>
+                        <td>${statusBadge(model.status)}</td>
+                        <td>${pct(model.score)}${scoreBar(model.score)}</td>
+                        <td>${model.latencyMs || 0} 毫秒</td>
+                        <td class="${model.errorMessage ? 'error' : ''}">${escapeHtml(model.errorMessage || model.responsePreview || '')}</td>
+                        <td>${renderChecksInline(model.checks || [])}</td>
+                    </tr>
+                `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    function renderRag(rag) {
+        $('ragStatus').innerHTML = statusBadge(rag.status);
+        const cases = [rag.answerableCase, rag.refusalCase].filter(hasRagCase);
+        $('ragPanel').innerHTML = `
+            <div class="kv">
+                <div>命名空间</div><div class="mono">${escapeHtml(rag.namespace || '')}</div>
+                <div>演示文档</div><div class="mono">${escapeHtml(rag.seedDocumentId || STATUS_TEXT[rag.seedStatus] || rag.seedStatus || '')}</div>
+                <div>文档 / 分片</div><div>${rag.documentCount || 0} / ${rag.chunkCount || 0}</div>
+                <div>分数</div><div>${pct(rag.score)} ${scoreBar(rag.score)}</div>
+            </div>
+            ${rag.message ? `<p class="text-muted">${escapeHtml(rag.message)}</p>` : ''}
+            <div class="case-list" style="margin-top:14px">
+                ${cases.length ? cases.map(renderRagCase).join('') : '<div class="empty">暂无在线 RAG 案例结果。点击“主动运行在线评测”生成。</div>'}
+            </div>
+            <div class="check-list" style="margin-top:14px">
+                ${(rag.checks || []).length ? (rag.checks || []).map(renderCheck).join('') : ''}
+            </div>
+        `;
+    }
+
+    function renderRagCase(item) {
+        return `
+            <div class="case-row">
+                <div class="case-head">
+                    <div class="case-title">${escapeHtml(formatCaseName(item.caseId))}</div>
+                    ${statusBadge(item.status)}
+                </div>
+                <div class="text-muted">问题：${escapeHtml(item.query || '')}</div>
+                <div class="text-muted">是否有证据支撑：${formatBool(item.supported)}，置信度：${escapeHtml(item.confidence ?? '未知')}，引用数：${item.citationCount || 0}，使用分片：${item.usedChunkCount || 0}</div>
+                <div class="text-muted">检索轨迹：稠密召回 ${item.denseHitCount || 0}，关键词召回 ${item.sparseHitCount || 0}，重排 ${item.rerankCount || 0}，总耗时 ${item.totalTimeMs || 0} 毫秒</div>
+                <div class="text-muted">回答：${escapeHtml(item.answerPreview || '')}</div>
+                <div class="check-list" style="margin-top:10px">${(item.checks || []).map(renderCheck).join('')}</div>
+            </div>
+        `;
+    }
+
+    function renderMemory(memory) {
+        $('memoryStatus').innerHTML = statusBadge(memory.status);
+        $('memoryPanel').innerHTML = `
+            <div class="kv">
+                <div>评测用户 ID</div><div class="mono">${escapeHtml(memory.userId || '')}</div>
+                <div>隔离用户 ID</div><div class="mono">${escapeHtml(memory.otherUserId || '')}</div>
+                <div>追踪标记</div><div class="mono">${escapeHtml(memory.marker || '')}</div>
+                <div>记忆 ID</div><div class="mono">${escapeHtml(memory.memoryId || '')}</div>
+                <div>分数</div><div>${pct(memory.score)} ${scoreBar(memory.score)}</div>
+            </div>
+            ${memory.message ? `<p class="text-muted">${escapeHtml(memory.message)}</p>` : ''}
+            <div class="check-list" style="margin-top:14px">
+                ${(memory.checks || []).map(renderCheck).join('')}
+            </div>
+        `;
+    }
+
+    function renderQuality(gate) {
+        $('qualityStatus').innerHTML = statusBadge(gate.status);
+        $('qualityPanel').innerHTML = `
+            <div class="kv">
+                <div>报告路径</div><div class="mono">${escapeHtml(gate.reportPath || '')}</div>
+                <div>用例数量</div><div>${gate.testsRun || 0}</div>
+                <div>失败 / 错误 / 跳过</div><div>${gate.failures || 0} / ${gate.errors || 0} / ${gate.skipped || 0}</div>
+                <div>说明</div><div>${escapeHtml(gate.message || '')}</div>
+            </div>
+        `;
+    }
+
+    function renderRecommendations(items) {
+        $('recommendations').innerHTML = items.length
+            ? items.map(item => `<li>${escapeHtml(item)}</li>`).join('')
+            : '<li>暂无建议。</li>';
+    }
+
+    function renderChecksInline(checks) {
+        if (!checks.length) {
+            return '<span class="text-muted">无</span>';
+        }
+        return checks.map(check => `${statusBadge(check.status)} <span class="text-muted">${escapeHtml(check.name)} ${pct(check.score)}</span>`).join('<br>');
+    }
+
+    function renderCheck(check) {
+        return `
+            <div class="check-row">
+                <div class="check-head">
+                    <div class="check-title">${escapeHtml(check.name || '')}</div>
+                    ${statusBadge(check.status)}
+                </div>
+                <div class="text-muted">${escapeHtml(check.message || '')}</div>
+                ${check.evidence ? `<div class="text-muted mono">${escapeHtml(formatEvidence(check.evidence))}</div>` : ''}
+            </div>
+        `;
+    }
+
+    async function loadReport() {
+        const namespace = $('namespaceInput').value.trim() || 'eval_report';
+        const res = await fetch(`/api/eval/report?namespace=${encodeURIComponent(namespace)}`);
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+        renderReport(await res.json());
+    }
+
+    async function refreshReport() {
+        const refreshBtn = $('refreshBtn');
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = '刷新中...';
+        try {
+            const body = {
+                namespace: $('namespaceInput').value.trim() || 'eval_report'
+            };
+            const res = await fetch('/api/eval/refresh', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+            renderReport(await res.json());
+        } finally {
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = '刷新最新数据';
+        }
+    }
+
+    async function runReport() {
+        const runBtn = $('runBtn');
+        runBtn.disabled = true;
+        runBtn.textContent = '在线评测中...';
+        try {
+            const models = $('modelsInput').value.split(',').map(v => v.trim()).filter(Boolean);
+            const body = {
+                namespace: $('namespaceInput').value.trim() || 'eval_report',
+                models,
+                seedRagDemo: $('seedInput').checked
+            };
+            const res = await fetch('/api/eval/run', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+            renderReport(await res.json());
+        } finally {
+            runBtn.disabled = false;
+            runBtn.textContent = '主动运行在线评测';
+        }
+    }
+
+    $('refreshBtn').addEventListener('click', () => refreshReport().catch(err => alert(err.message)));
+    $('runBtn').addEventListener('click', () => runReport().catch(err => alert(err.message)));
+    loadReport().catch(err => {
+        $('summaryTitle').textContent = '报告加载失败';
+        $('summaryText').textContent = err.message;
+    });
+</script>
+</body>
+</html>
