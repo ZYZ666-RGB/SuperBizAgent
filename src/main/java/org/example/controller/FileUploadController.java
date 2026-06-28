@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 @RestController
 public class FileUploadController {
@@ -62,8 +63,12 @@ public class FileUploadController {
         }
 
         try {
+            String userId = resolveUserId(headerUserId);
             logger.info("[RAG-OFFLINE] Upload received: {}, namespace={}", originalFilename, namespace);
-            IndexResult indexResult = ragOfflineIndexService.indexUploadedFile(file, namespace);
+            IndexResult indexResult = ragOfflineIndexService.indexUploadedFile(
+                    file,
+                    namespace,
+                    uploadTags(userId, sessionId, namespace));
             String indexStatus = indexResult.isSuccess() ? "SUCCESS" : "FAILED";
             String indexError = indexResult.getErrorMessage();
             Path storedPath = indexResult.getSourcePath() == null
@@ -71,13 +76,14 @@ public class FileUploadController {
                     : Paths.get(indexResult.getSourcePath()).normalize();
 
             saveUploadEvent(
-                    resolveUserId(headerUserId),
+                    userId,
                     sessionId,
                     originalFilename,
                     storedPath,
                     file.getSize(),
                     indexStatus,
-                    indexError);
+                    indexError,
+                    indexResult);
 
             if (!indexResult.isSuccess()) {
                 ApiResponse<IndexResult> errorResponse = new ApiResponse<>();
@@ -149,8 +155,11 @@ public class FileUploadController {
         if (allowedExtensions == null || allowedExtensions.isEmpty()) {
             return false;
         }
-        List<String> allowedList = Arrays.asList(allowedExtensions.split(","));
-        return allowedList.contains(extension.toLowerCase());
+        List<String> allowedList = Arrays.stream(allowedExtensions.split(","))
+                .map(value -> value.trim().toLowerCase(Locale.ROOT))
+                .filter(value -> !value.isBlank())
+                .toList();
+        return allowedList.contains(extension.toLowerCase(Locale.ROOT));
     }
 
     private void saveUploadEvent(
@@ -160,12 +169,18 @@ public class FileUploadController {
             Path filePath,
             long fileSize,
             String indexStatus,
-            String indexError) {
+            String indexError,
+            IndexResult indexResult) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("fileName", originalFilename);
         metadata.put("filePath", filePath.toString());
         metadata.put("fileSize", fileSize);
         metadata.put("indexStatus", indexStatus);
+        if (indexResult != null) {
+            metadata.put("documentId", indexResult.getDocumentId());
+            metadata.put("chunkCount", indexResult.getChunkCount());
+            metadata.put("markdownPath", indexResult.getMarkdownPath());
+        }
         if (indexError != null && !indexError.isBlank()) {
             metadata.put("indexError", indexError);
         }
@@ -185,5 +200,18 @@ public class FileUploadController {
             return "default_user";
         }
         return headerUserId.trim();
+    }
+
+    private String uploadTags(String userId, String sessionId, String namespace) {
+        List<String> tags = new java.util.ArrayList<>();
+        tags.add("upload");
+        tags.add("namespace=" + (namespace == null || namespace.isBlank() ? "default" : namespace.trim()));
+        if (userId != null && !userId.isBlank()) {
+            tags.add("userId=" + userId.trim());
+        }
+        if (sessionId != null && !sessionId.isBlank()) {
+            tags.add("sessionId=" + sessionId.trim());
+        }
+        return String.join(",", tags);
     }
 }

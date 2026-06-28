@@ -77,7 +77,7 @@ public class ChatService {
         return DashScopeChatModel.builder()
                 .dashScopeApi(dashScopeApi)
                 .defaultOptions(DashScopeChatOptions.builder()
-                        .withModel(DashScopeChatModel.DEFAULT_MODEL_NAME)
+                        .withModel("deepseek-v4-flash")
                         .withTemperature(temperature)
                         .withMaxToken(maxToken)
                         .withTopP(topP)

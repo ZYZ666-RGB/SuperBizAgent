@@ -11,7 +11,7 @@ import java.util.Set;
 public class FileTypeDetector {
 
     private static final Set<String> MARKDOWN_FILE_TYPES = Set.of(
-            "md", "txt", "log", "json", "yaml", "yml", "java", "py", "sql");
+            "md", "markdown", "txt", "log", "json", "yaml", "yml", "java", "py", "sql");
     private static final Set<String> RICH_FILE_TYPES = Set.of(
             "pdf", "docx", "xlsx", "pptx", "html", "htm");
 

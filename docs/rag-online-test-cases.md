@@ -45,6 +45,10 @@ Latest local verification on this branch: passed.
   - Returns answer, citations, confidence, and trace when evidence exists.
   - Refuses to answer when retrieval returns no evidence.
 
+- `RagEvalDatasetTest`
+  - Runs a deterministic offline eval dataset.
+  - Checks expected chunk usage, citations, support confidence, required answer terms, and no-evidence refusal.
+
 ## Expected Effect
 
-The online chain can now be tested without requiring live Milvus or DashScope services for every case. Dense retrieval remains wired to Milvus for runtime use, while local tests keep the core reasoning path stable: analysis, rewrite, sparse recall, fusion, rerank fallback, context/citation construction, answer verification, and no-evidence refusal.
+The online chain can now be tested without requiring live Milvus or DashScope services for every case. Dense retrieval remains wired to Milvus for runtime use, while local tests keep the core reasoning path stable: analysis, rewrite, sparse recall, fusion, rerank fallback, context/citation construction, answer verification, no-evidence refusal, and deterministic RAG quality gating.

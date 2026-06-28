@@ -45,28 +45,35 @@ public class MarkdownChunkService {
                 continue;
             }
             String headingPath = defaultText(block.getHeadingPath(), "");
-            int blockTokens = block.getTokenCount() == null ? tokenEstimator.estimate(block.getContent()) : block.getTokenCount();
-            boolean headingChanged = !currentHeading.equals(headingPath) && current.length() > 0;
-            boolean wouldExceedTarget = currentTokens > 0
-                    && currentTokens + blockTokens > ragProperties.getChunk().getTargetTokens();
+            int partStart = block.getStartOffset() == null ? 0 : block.getStartOffset();
+            for (String part : splitOversizedContent(block.getContent())) {
+                int partTokens = tokenEstimator.estimate(part);
+                boolean headingChanged = !currentHeading.equals(headingPath) && current.length() > 0;
+                boolean wouldExceedTarget = currentTokens > 0
+                        && currentTokens + partTokens > ragProperties.getChunk().getTargetTokens();
 
-            if (headingChanged || wouldExceedTarget) {
-                chunks.add(toChunk(document, current.toString(), currentHeading, currentStart, currentEnd, chunkIndex++));
-                String overlap = headingChanged ? "" : overlap(current.toString());
-                current.setLength(0);
-                if (!overlap.isBlank()) {
-                    current.append(overlap).append("\n\n");
+                if (headingChanged || wouldExceedTarget) {
+                    chunks.add(toChunk(document, current.toString(), currentHeading, currentStart, currentEnd, chunkIndex++));
+                    int overlapBudget = Math.max(0, ragProperties.getChunk().getTargetTokens() - partTokens);
+                    String overlap = headingChanged ? "" : overlap(current.toString(), overlapBudget);
+                    current.setLength(0);
+                    if (!overlap.isBlank()) {
+                        current.append(overlap).append("\n\n");
+                    }
+                    currentTokens = tokenEstimator.estimate(overlap);
                 }
-                currentTokens = tokenEstimator.estimate(overlap);
-            }
 
-            if (current.length() == 0) {
-                currentStart = block.getStartOffset() == null ? 0 : block.getStartOffset();
-                currentHeading = headingPath;
+                if (current.length() == 0) {
+                    currentStart = partStart;
+                    currentHeading = headingPath;
+                }
+                current.append(part.trim()).append("\n\n");
+                currentEnd = Math.min(
+                        block.getEndOffset() == null ? partStart + part.length() : block.getEndOffset(),
+                        partStart + part.length());
+                currentTokens += partTokens;
+                partStart += part.length();
             }
-            current.append(block.getContent().trim()).append("\n\n");
-            currentEnd = block.getEndOffset() == null ? currentStart + current.length() : block.getEndOffset();
-            currentTokens += blockTokens;
         }
 
         if (!current.isEmpty()) {
@@ -127,20 +134,58 @@ public class MarkdownChunkService {
         return merged;
     }
 
-    private String overlap(String content) {
-        int overlapTokens = Math.max(0, ragProperties.getChunk().getOverlapTokens());
+    private String overlap(String content, int maxOverlapTokens) {
+        int overlapTokens = Math.min(
+                Math.max(0, ragProperties.getChunk().getOverlapTokens()),
+                Math.max(0, maxOverlapTokens));
         if (overlapTokens == 0 || content.isBlank()) {
             return "";
         }
-        String[] words = content.trim().split("\\s+");
-        if (words.length <= overlapTokens) {
-            return content.trim();
-        }
+        String normalized = content.trim();
         StringBuilder builder = new StringBuilder();
-        for (int i = Math.max(0, words.length - overlapTokens); i < words.length; i++) {
-            builder.append(words[i]).append(' ');
+        int tokens = 0;
+        for (int offset = normalized.length(); offset > 0; ) {
+            int codePoint = normalized.codePointBefore(offset);
+            String text = new String(Character.toChars(codePoint));
+            int nextTokens = Math.max(1, tokenEstimator.estimate(text));
+            if (tokens + nextTokens > overlapTokens) {
+                break;
+            }
+            builder.insert(0, text);
+            tokens += nextTokens;
+            offset -= Character.charCount(codePoint);
         }
         return builder.toString().trim();
+    }
+
+    private List<String> splitOversizedContent(String content) {
+        String normalized = defaultText(content, "").trim();
+        int maxTokens = Math.max(100, ragProperties.getChunk().getMaxTokens());
+        if (tokenEstimator.estimate(normalized) <= maxTokens) {
+            return List.of(normalized);
+        }
+        List<String> parts = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int currentTokens = 0;
+        for (int offset = 0; offset < normalized.length(); ) {
+            int codePoint = normalized.codePointAt(offset);
+            String text = new String(Character.toChars(codePoint));
+            int tokens = Math.max(1, tokenEstimator.estimate(text));
+            if (!current.isEmpty() && currentTokens + tokens > maxTokens) {
+                parts.add(current.toString().trim());
+                current.setLength(0);
+                currentTokens = 0;
+            }
+            current.appendCodePoint(codePoint);
+            currentTokens += tokens;
+            offset += Character.charCount(codePoint);
+        }
+        if (!current.isEmpty()) {
+            parts.add(current.toString().trim());
+        }
+        return parts.stream()
+                .filter(part -> !part.isBlank())
+                .toList();
     }
 
     private String stableChunkId(RagChunk chunk) {

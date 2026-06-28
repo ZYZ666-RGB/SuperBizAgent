@@ -179,8 +179,10 @@ public class ContextEngineeringService {
         }
         String lower = query.toLowerCase(Locale.ROOT);
         return containsAny(lower,
-                "文档", "知识库", "手册", "配置", "错误", "故障", "异常", "排查", "告警", "日志",
-                "服务", "依赖", "cpu", "内存", "磁盘", "超时", "error", "exception", "runbook");
+                "上传", "文件", "附件", "内容", "资料", "材料", "文档", "知识库", "手册",
+                "复习", "期末", "考试", "课程", "重点", "知识点", "章节", "学习",
+                "配置", "错误", "故障", "异常", "排查", "告警", "日志", "服务", "依赖",
+                "cpu", "内存", "磁盘", "超时", "error", "exception", "runbook", "document", "file");
     }
 
     private String chatRolePolicy() {
@@ -190,6 +192,7 @@ public class ContextEngineeringService {
                 - 最近对话优先使用原文，旧历史只依赖 Conversation Summary。
                 - Memory 是长期偏好、项目状态和稳定事实；如果和当前用户输入冲突，以当前输入为准。
                 - Evidence 是知识库/RAG 检索证据；涉及事实、配置、排障、手册和告警时必须优先依据 Evidence。
+                - 用户提到上传文件、附件、资料、复习、期末、考试、课程或“这个内容”时，如果 Evidence 中有上传文档片段，必须直接基于 Evidence 回答，不要声称没有看到文件。
                 - Tool Results 是工具压缩结果；不要把没有进入上下文的原始工具输出当成事实。
                 - 不确定时说明缺口，不要编造。
                 """;
@@ -199,6 +202,7 @@ public class ContextEngineeringService {
         return """
                 用中文回答用户。
                 如果使用 Evidence，请自然说明依据；如果 Evidence 不足，请明确说知识库证据不足。
+                如果 Evidence 来自用户上传文件，请直接概括或回答文件相关问题，不要要求用户重新上传同一个文件。
                 回答要聚焦当前任务，不要暴露内部上下文调度细节。
                 """;
     }

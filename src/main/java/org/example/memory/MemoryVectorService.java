@@ -14,6 +14,7 @@ import io.milvus.param.dml.InsertParam;
 import io.milvus.param.dml.SearchParam;
 import io.milvus.response.SearchResultsWrapper;
 import org.example.constant.MilvusConstants;
+import org.example.rag.index.MilvusRagIndexService;
 import org.example.service.VectorEmbeddingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -169,7 +170,9 @@ public class MemoryVectorService {
         fields.add(new InsertParam.Field("app_id", List.of(defaultText(memory.getAppId(), "super_biz_agent"))));
         fields.add(new InsertParam.Field("memory_type", List.of(defaultText(memory.getMemoryType(), "semantic"))));
         fields.add(new InsertParam.Field("scope_type", List.of(defaultText(memory.getScopeType(), "user"))));
-        fields.add(new InsertParam.Field("content", List.of(truncate(defaultText(memory.getContent(), ""), MilvusConstants.CONTENT_MAX_LENGTH))));
+        fields.add(new InsertParam.Field("content", List.of(MilvusRagIndexService.truncateToUtf8Bytes(
+                defaultText(memory.getContent(), ""),
+                MilvusConstants.CONTENT_MAX_LENGTH))));
         fields.add(new InsertParam.Field("importance", List.of(memory.getImportance() == null ? 0.5 : memory.getImportance())));
         fields.add(new InsertParam.Field("metadata", List.of(metadataJson)));
         fields.add(new InsertParam.Field("created_at", List.of(LocalDateTime.now().toString())));
@@ -265,13 +268,6 @@ public class MemoryVectorService {
             return defaultValue;
         }
         return value;
-    }
-
-    private String truncate(String value, int maxLength) {
-        if (value.length() <= maxLength) {
-            return value;
-        }
-        return value.substring(0, maxLength);
     }
 
     private record ScoredMemory(UserMemory memory, double score) {

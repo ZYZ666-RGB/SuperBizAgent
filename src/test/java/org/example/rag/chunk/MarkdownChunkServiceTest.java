@@ -45,6 +45,26 @@ class MarkdownChunkServiceTest {
                 .allSatisfy(chunk -> assertThat(chunk.getParentChunkId()).isNotBlank());
     }
 
+    @Test
+    void splitsOversizedCjkParagraphsBeforeIndexing() {
+        RagProperties properties = new RagProperties();
+        properties.getChunk().setTargetTokens(100);
+        properties.getChunk().setMaxTokens(120);
+        properties.getChunk().setMinTokens(1);
+        TokenEstimator tokenEstimator = new TokenEstimator();
+        MarkdownChunkService chunkService = new MarkdownChunkService(
+                new MarkdownSectionParser(tokenEstimator),
+                tokenEstimator,
+                properties);
+        ParsedDocument document = document();
+
+        List<RagChunk> chunks = chunkService.chunk(document, "# 复习资料\n\n" + "数据库事务隔离级别".repeat(100));
+
+        assertThat(chunks).hasSizeGreaterThan(1);
+        assertThat(chunks).allSatisfy(chunk ->
+                assertThat(chunk.getTokenCount()).isLessThanOrEqualTo(properties.getChunk().getMaxTokens()));
+    }
+
     private ParsedDocument document() {
         ParsedDocument document = new ParsedDocument();
         document.setDocumentId("doc-1");

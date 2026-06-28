@@ -1,6 +1,9 @@
 package org.example.context;
 
 import org.example.rag.online.AdvancedRagOnlineService;
+import org.example.rag.index.RagMetadataStoreService;
+import org.example.rag.model.RagChunk;
+import org.example.rag.model.RagDocument;
 import org.example.rag.online.model.RagQueryRequest;
 import org.example.rag.online.model.RagQueryResult;
 import org.example.rag.online.model.RetrievalCandidate;
@@ -20,14 +23,17 @@ public class RagEvidenceAdapter {
     private static final Logger logger = LoggerFactory.getLogger(RagEvidenceAdapter.class);
 
     private final AdvancedRagOnlineService advancedRagOnlineService;
+    private final RagMetadataStoreService metadataStoreService;
     private final ContextConfig config;
     private final ContextCompressor compressor;
 
     public RagEvidenceAdapter(
             AdvancedRagOnlineService advancedRagOnlineService,
+            RagMetadataStoreService metadataStoreService,
             ContextConfig config,
             ContextCompressor compressor) {
         this.advancedRagOnlineService = advancedRagOnlineService;
+        this.metadataStoreService = metadataStoreService;
         this.config = config;
         this.compressor = compressor;
     }
@@ -47,10 +53,13 @@ public class RagEvidenceAdapter {
             request.setDebug(false);
 
             RagQueryResult result = advancedRagOnlineService.search(request);
-            if (result == null || result.getCandidates() == null) {
-                return List.of();
+            if (result != null && result.getCandidates() != null && !result.getCandidates().isEmpty()) {
+                return toPackets(result.getCandidates());
             }
-            return toPackets(result.getCandidates());
+            if (shouldUseLatestDocumentFallback(runtimeContext.getQuery())) {
+                return latestDocumentPackets(runtimeContext);
+            }
+            return List.of();
         } catch (Exception e) {
             logger.warn("RAG evidence retrieval skipped. query={}, error={}",
                     runtimeContext.getQuery(), e.getMessage());
@@ -78,6 +87,44 @@ public class RagEvidenceAdapter {
             packets.add(packet);
         }
         return packets;
+    }
+
+    private List<ContextPacket> latestDocumentPackets(RuntimeContext runtimeContext) {
+        String namespace = defaultText(runtimeContext.getNamespace(), "default");
+        return metadataStoreService.findLatestCompletedDocument(namespace)
+                .map(document -> {
+                    List<RagChunk> chunks = metadataStoreService.findInitialChildChunks(
+                            document.getDocumentId(),
+                            Math.max(1, config.getRagTopK()));
+                    if (chunks.isEmpty()) {
+                        return List.<ContextPacket>of();
+                    }
+                    logger.info("Using latest uploaded document as RAG fallback. namespace={}, fileName={}, chunks={}",
+                            namespace, document.getFileName(), chunks.size());
+                    return toPackets(chunks.stream()
+                            .map(chunk -> fallbackCandidate(document, chunk))
+                            .toList());
+                })
+                .orElseGet(List::of);
+    }
+
+    private RetrievalCandidate fallbackCandidate(RagDocument document, RagChunk chunk) {
+        RetrievalCandidate candidate = new RetrievalCandidate();
+        candidate.setChunkId(chunk.getChunkId());
+        candidate.setDocumentId(chunk.getDocumentId());
+        candidate.setParentChunkId(chunk.getParentChunkId());
+        candidate.setNamespace(chunk.getNamespace());
+        candidate.setFileName(defaultText(chunk.getFileName(), document.getFileName()));
+        candidate.setFileType(defaultText(chunk.getFileType(), document.getFileType()));
+        candidate.setSourcePath(defaultText(chunk.getSourcePath(), document.getSourcePath()));
+        candidate.setHeadingPath(defaultText(chunk.getHeadingPath(), document.getFileName()));
+        candidate.setChunkIndex(chunk.getChunkIndex());
+        candidate.setContent(chunk.getContent());
+        candidate.setEmbeddingContent(chunk.getEmbeddingContent());
+        candidate.setMetadata(chunk.getMetadata());
+        candidate.setSparseScore(0.62);
+        candidate.getMatchedBy().add("latest-upload-fallback");
+        return candidate;
     }
 
     private Map<String, Object> metadata(RetrievalCandidate candidate, double score) {
@@ -120,6 +167,13 @@ public class RagEvidenceAdapter {
         return Math.max(0.0, Math.min(1.0, score));
     }
 
+    private boolean shouldUseLatestDocumentFallback(String query) {
+        String value = defaultText(query, "").toLowerCase(Locale.ROOT);
+        return containsAny(value,
+                "上传", "文件", "附件", "这个", "这份", "刚才", "刚刚", "上面", "前面",
+                "内容", "资料", "材料", "复习", "期末", "考试", "课程", "重点", "知识点");
+    }
+
     private Double firstNonNull(Double... values) {
         for (Double value : values) {
             if (value != null) {
@@ -143,5 +197,14 @@ public class RagEvidenceAdapter {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private boolean containsAny(String value, String... needles) {
+        for (String needle : needles) {
+            if (value.contains(needle)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

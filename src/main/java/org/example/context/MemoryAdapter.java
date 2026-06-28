@@ -48,7 +48,7 @@ public class MemoryAdapter {
             packet.getMetadata().put("memoryType", memory.getMemoryType());
             packet.getMetadata().put("scopeType", memory.getScopeType());
             packet.getMetadata().put("source", memory.getSource());
-            packet.setRelevanceScore(lexicalRelevance(runtimeContext.getQuery(), memory.getContent()));
+            packet.setRelevanceScore(memoryRelevance(runtimeContext.getQuery(), memory));
             packet.setRecencyScore(recencyScore(memory.getUpdatedAt() == null ? memory.getCreatedAt() : memory.getUpdatedAt()));
             packet.setImportanceScore(clamp(memory.getImportance() == null ? 0.5 : memory.getImportance()));
             packet.setCreatedAt(memory.getCreatedAt());
@@ -56,6 +56,15 @@ public class MemoryAdapter {
             packets.add(packet);
         }
         return packets;
+    }
+
+    double memoryRelevance(String query, UserMemory memory) {
+        if (memory == null) {
+            return 0.0;
+        }
+        double lexical = lexicalRelevance(query, memory.getContent());
+        double intent = intentRelevance(query, memory);
+        return Math.max(lexical, intent);
     }
 
     double lexicalRelevance(String query, String content) {
@@ -71,6 +80,50 @@ public class MemoryAdapter {
             }
         }
         return clamp((double) hits / queryTokens.size());
+    }
+
+    private double intentRelevance(String query, UserMemory memory) {
+        String normalizedQuery = defaultText(query, "").toLowerCase(Locale.ROOT);
+        String content = defaultText(memory.getContent(), "").toLowerCase(Locale.ROOT);
+        String type = defaultText(memory.getMemoryType(), "").toLowerCase(Locale.ROOT);
+
+        if (isIdentityQuestion(normalizedQuery) && isIdentityMemory(content, type)) {
+            return 1.0;
+        }
+        if (isPreferenceQuestion(normalizedQuery) && ("preference".equals(type) || containsAny(content, "偏好", "喜欢", "默认", "以后"))) {
+            return 0.85;
+        }
+        if (isProjectQuestion(normalizedQuery) && ("project_context".equals(type) || containsAny(content, "项目", "架构", "约束"))) {
+            return 0.85;
+        }
+        return 0.0;
+    }
+
+    private boolean isIdentityQuestion(String query) {
+        return containsAny(query,
+                "我是谁",
+                "我叫什么",
+                "我的名字",
+                "我的姓名",
+                "怎么称呼我",
+                "如何称呼我",
+                "你记得我",
+                "你认识我",
+                "who am i",
+                "my name");
+    }
+
+    private boolean isIdentityMemory(String content, String memoryType) {
+        return "preference".equals(memoryType)
+                && containsAny(content, "名字", "姓名", "称呼", "叫", "name");
+    }
+
+    private boolean isPreferenceQuestion(String query) {
+        return containsAny(query, "我的偏好", "我喜欢", "我不喜欢", "默认", "以后怎么", "preference");
+    }
+
+    private boolean isProjectQuestion(String query) {
+        return containsAny(query, "我的项目", "当前项目", "这个项目", "项目约束", "项目架构");
     }
 
     double recencyScore(LocalDateTime timestamp) {
@@ -138,5 +191,17 @@ public class MemoryAdapter {
 
     private String defaultText(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private boolean containsAny(String value, String... needles) {
+        if (value == null) {
+            return false;
+        }
+        for (String needle : needles) {
+            if (needle != null && !needle.isBlank() && value.contains(needle.toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
     }
 }

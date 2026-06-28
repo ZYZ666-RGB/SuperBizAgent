@@ -1,0 +1,82 @@
+[
+  {
+    "id": "redis-timeout-runbook",
+    "query": "How should order-service handle Redis timeout?",
+    "namespace": "default",
+    "topK": 3,
+    "shouldAnswer": true,
+    "expectedChunkIds": ["redis-timeout-1"],
+    "requiredAnswerTerms": ["Redis", "timeout", "order-service", "connection pool"],
+    "minConfidence": 0.55
+  },
+  {
+    "id": "cpu-alert-runbook",
+    "query": "What should payment-service do for high CPU alerts?",
+    "namespace": "default",
+    "topK": 3,
+    "shouldAnswer": true,
+    "expectedChunkIds": ["cpu-alert-1"],
+    "requiredAnswerTerms": ["CPU", "payment-service", "hot threads"],
+    "minConfidence": 0.55
+  },
+  {
+    "id": "unknown-procedure-refusal",
+    "query": "How do we rotate the quantum scheduler token?",
+    "namespace": "default",
+    "topK": 3,
+    "shouldAnswer": false,
+    "expectedChunkIds": [],
+    "requiredAnswerTerms": [],
+    "minConfidence": 0.0
+  },
+  {
+    "id": "memory-oom-runbook",
+    "query": "What should we check when order-service has OOM and high memory usage?",
+    "namespace": "default",
+    "topK": 3,
+    "shouldAnswer": true,
+    "expectedChunkIds": ["memory-oom-1"],
+    "requiredAnswerTerms": ["OOM", "heap dump", "Full GC", "memory leak"],
+    "minConfidence": 0.55
+  },
+  {
+    "id": "disk-full-runbook",
+    "query": "How should we respond when disk usage is above 90 percent?",
+    "namespace": "default",
+    "topK": 3,
+    "shouldAnswer": true,
+    "expectedChunkIds": ["disk-full-1"],
+    "requiredAnswerTerms": ["disk", "log rotation", "temporary files", "capacity"],
+    "minConfidence": 0.55
+  },
+  {
+    "id": "service-unavailable-runbook",
+    "query": "What is the first response for ServiceUnavailable health check failures?",
+    "namespace": "default",
+    "topK": 3,
+    "shouldAnswer": true,
+    "expectedChunkIds": ["service-unavailable-1"],
+    "requiredAnswerTerms": ["ServiceUnavailable", "health check", "rollback", "dependency"],
+    "minConfidence": 0.55
+  },
+  {
+    "id": "slow-response-runbook",
+    "query": "What should we inspect when P99 response time is over 3 seconds?",
+    "namespace": "default",
+    "topK": 3,
+    "shouldAnswer": true,
+    "expectedChunkIds": ["slow-response-1"],
+    "requiredAnswerTerms": ["P99", "slow query", "database", "cache"],
+    "minConfidence": 0.55
+  },
+  {
+    "id": "unknown-vendor-refusal",
+    "query": "What is the recovery runbook for the moonbase telemetry broker?",
+    "namespace": "default",
+    "topK": 3,
+    "shouldAnswer": false,
+    "expectedChunkIds": [],
+    "requiredAnswerTerms": [],
+    "minConfidence": 0.0
+  }
+]

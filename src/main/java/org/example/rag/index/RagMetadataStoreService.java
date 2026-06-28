@@ -174,6 +174,37 @@ public class RagMetadataStoreService {
                 documentId);
     }
 
+    public Optional<RagDocument> findLatestCompletedDocument(String namespace) {
+        String normalizedNamespace = namespace == null || namespace.isBlank() ? null : namespace;
+        List<RagDocument> documents = jdbcTemplate.query("""
+                        SELECT *
+                        FROM rag_document
+                        WHERE (? IS NULL OR namespace = ?)
+                          AND status = ?
+                        ORDER BY updated_at DESC, id DESC
+                        LIMIT 1
+                        """,
+                documentRowMapper,
+                normalizedNamespace,
+                normalizedNamespace,
+                IndexStatus.COMPLETED.name());
+        return documents.isEmpty() ? Optional.empty() : Optional.of(documents.get(0));
+    }
+
+    public List<RagChunk> findInitialChildChunks(String documentId, int limit) {
+        return jdbcTemplate.query("""
+                        SELECT *
+                        FROM rag_chunk
+                        WHERE document_id = ?
+                          AND (chunk_index IS NULL OR chunk_index >= 0)
+                        ORDER BY chunk_index ASC, id ASC
+                        LIMIT ?
+                        """,
+                chunkRowMapper,
+                documentId,
+                Math.max(1, limit));
+    }
+
     public Optional<RagChunk> findChunkById(String chunkId) {
         List<RagChunk> chunks = jdbcTemplate.query(
                 "SELECT * FROM rag_chunk WHERE chunk_id = ? LIMIT 1",

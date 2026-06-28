@@ -1,8 +1,18 @@
 // SuperBizAgent - Modern Frontend Application
+const SUPPORTED_UPLOAD_EXTENSIONS = [
+    '.txt', '.md', '.markdown', '.log',
+    '.json', '.yaml', '.yml',
+    '.java', '.py', '.sql',
+    '.pdf', '.docx', '.xlsx', '.pptx',
+    '.html', '.htm'
+];
+const SUPPORTED_UPLOAD_LABEL = 'TXT、Markdown、日志、JSON/YAML、代码、PDF、Word、Excel、PPT、HTML';
+
 class SuperBizAgentApp {
     constructor() {
         this.apiBaseUrl = '/api';
         this.currentMode = 'stream';
+        this.userId = this.loadUserId();
         this.sessionId = this.generateSessionId();
         this.isStreaming = false;
         this.currentChatHistory = [];
@@ -14,6 +24,7 @@ class SuperBizAgentApp {
         this.bindEvents();
         this.initMarkdown();
         this.applyTheme();
+        this.applyUploadSupport();
         this.renderChatHistory();
         this.updateUI();
     }
@@ -127,6 +138,18 @@ class SuperBizAgentApp {
 
     loadThemePreference() {
         return localStorage.getItem('theme') === 'dark';
+    }
+
+    loadUserId() {
+        const existing = localStorage.getItem('superBizUserId');
+        if (existing) return existing;
+        const created = 'web_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+        localStorage.setItem('superBizUserId', created);
+        return created;
+    }
+
+    headers(extra = {}) {
+        return { ...extra, 'X-User-Id': this.userId };
     }
 
     applyTheme() {
@@ -297,8 +320,8 @@ class SuperBizAgentApp {
         try {
             const res = await fetch(`${this.apiBaseUrl}/chat`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ Id: this.sessionId, Question: message })
+                headers: this.headers({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ Id: this.sessionId, UserId: this.userId, Question: message })
             });
 
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -320,8 +343,8 @@ class SuperBizAgentApp {
     async sendStreamMessage(message) {
         const res = await fetch(`${this.apiBaseUrl}/chat_stream`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ Id: this.sessionId, Question: message })
+            headers: this.headers({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ Id: this.sessionId, UserId: this.userId, Question: message })
         });
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -368,7 +391,7 @@ class SuperBizAgentApp {
         try {
             const res = await fetch(`${this.apiBaseUrl}/ai_ops`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: this.headers({ 'Content-Type': 'application/json' })
             });
 
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -465,14 +488,22 @@ class SuperBizAgentApp {
 
     // ==================== File Upload ====================
 
+    applyUploadSupport() {
+        if (this.fileInput) {
+            this.fileInput.accept = SUPPORTED_UPLOAD_EXTENSIONS.join(',');
+        }
+        if (this.uploadBtn) {
+            this.uploadBtn.title = `上传文件到知识库，支持 ${SUPPORTED_UPLOAD_LABEL}`;
+        }
+    }
+
     handleFileSelect(event) {
         const file = event.target.files[0];
         if (!file) return;
 
-        const allowed = ['.txt', '.md', '.markdown'];
         const ext = '.' + file.name.split('.').pop().toLowerCase();
-        if (!allowed.includes(ext)) {
-            this.showToast('仅支持 .txt 和 .md 文件', 'error');
+        if (!SUPPORTED_UPLOAD_EXTENSIONS.includes(ext)) {
+            this.showToast(`仅支持 ${SUPPORTED_UPLOAD_LABEL} 文件`, 'error');
             this.fileInput.value = '';
             return;
         }
@@ -493,8 +524,14 @@ class SuperBizAgentApp {
         try {
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('sessionId', this.sessionId);
+            formData.append('namespace', 'default');
 
-            const res = await fetch(`${this.apiBaseUrl}/upload`, { method: 'POST', body: formData });
+            const res = await fetch(`${this.apiBaseUrl}/upload`, {
+                method: 'POST',
+                headers: this.headers(),
+                body: formData
+            });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const data = await res.json();

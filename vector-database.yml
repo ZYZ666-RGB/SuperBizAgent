@@ -7,7 +7,7 @@ services:
       MYSQL_DATABASE: super_biz_agent
       TZ: Asia/Shanghai
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY:-.}/volumes/mysql:/var/lib/mysql
     healthcheck:

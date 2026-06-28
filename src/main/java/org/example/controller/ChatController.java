@@ -245,7 +245,7 @@ public class ChatController {
                 DashScopeChatModel chatModel = DashScopeChatModel.builder()
                         .dashScopeApi(dashScopeApi)
                         .defaultOptions(DashScopeChatOptions.builder()
-                                .withModel(DashScopeChatModel.DEFAULT_MODEL_NAME)
+                                .withModel("deepseek-v4-flash")
                                 .withTemperature(0.3)
                                 .withMaxToken(8000)
                                 .withTopP(0.9)

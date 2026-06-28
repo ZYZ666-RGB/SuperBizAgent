@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -70,9 +71,20 @@ public class MilvusRagIndexService {
     }
 
     private void insertChunk(RagChunk chunk, List<Float> vector) {
+        String content = defaultText(chunk.getContent(), "");
+        String milvusContent = truncateToUtf8Bytes(content, MilvusConstants.CONTENT_MAX_LENGTH);
+        if (!milvusContent.equals(content)) {
+            logger.warn("[RAG-OFFLINE] Chunk content truncated before Milvus insert. chunkId={}, chars={} -> {}, bytes={} -> {}",
+                    chunk.getChunkId(),
+                    content.length(),
+                    milvusContent.length(),
+                    utf8Length(content),
+                    utf8Length(milvusContent));
+        }
+
         List<InsertParam.Field> fields = new ArrayList<>();
         fields.add(new InsertParam.Field("id", List.of(chunk.getChunkId())));
-        fields.add(new InsertParam.Field("content", List.of(truncate(defaultText(chunk.getContent(), ""), MilvusConstants.CONTENT_MAX_LENGTH))));
+        fields.add(new InsertParam.Field("content", List.of(milvusContent)));
         fields.add(new InsertParam.Field("vector", List.of(vector)));
         JsonObject metadata = gson.toJsonTree(chunk.getMetadata()).getAsJsonObject();
         fields.add(new InsertParam.Field("metadata", List.of(metadata)));
@@ -104,11 +116,31 @@ public class MilvusRagIndexService {
         return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    private String truncate(String value, int maxLength) {
-        if (value.length() <= maxLength) {
+    public static String truncateToUtf8Bytes(String value, int maxBytes) {
+        if (value == null || value.isEmpty() || maxBytes <= 0) {
+            return "";
+        }
+        if (utf8Length(value) <= maxBytes) {
             return value;
         }
-        return value.substring(0, maxLength);
+        StringBuilder builder = new StringBuilder(value.length());
+        int bytes = 0;
+        for (int offset = 0; offset < value.length(); ) {
+            int codePoint = value.codePointAt(offset);
+            String codePointText = new String(Character.toChars(codePoint));
+            int codePointBytes = utf8Length(codePointText);
+            if (bytes + codePointBytes > maxBytes) {
+                break;
+            }
+            builder.appendCodePoint(codePoint);
+            bytes += codePointBytes;
+            offset += Character.charCount(codePoint);
+        }
+        return builder.toString();
+    }
+
+    private static int utf8Length(String value) {
+        return value.getBytes(StandardCharsets.UTF_8).length;
     }
 
     private String defaultText(String value, String defaultValue) {

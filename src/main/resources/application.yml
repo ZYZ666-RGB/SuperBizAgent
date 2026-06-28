@@ -9,7 +9,7 @@ server:
 file:
   upload:
     path: ./uploads
-    allowed-extensions: txt,md,log,json,yaml,yml,java,py,sql,pdf,docx,xlsx,pptx,html,htm
+    allowed-extensions: txt,md,markdown,log,json,yaml,yml,java,py,sql,pdf,docx,xlsx,pptx,html,htm
 
 milvus:
   host: localhost
@@ -72,7 +72,7 @@ context:
 # Spring AI Alibaba DashScope 配置
 spring:
   datasource:
-    url: "${MYSQL_URL:jdbc:mysql://localhost:3306/super_biz_agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}"
+    url: "${MYSQL_URL:jdbc:mysql://localhost:3307/super_biz_agent?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}"
     username: ${MYSQL_USERNAME:root}
     password: ${MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -86,6 +86,7 @@ spring:
       chat:
         options:
           timeout: 180000  # 超时时间180秒（3分钟）
+          model: deepseek-v4-flash
       retry:
         max-attempts: 3  # 最大重试次数
         backoff:
@@ -97,7 +98,7 @@ spring:
     # 如果使用mock数据，请注释这部分内容
     mcp:
       client:
-        enabled: true
+        enabled: false
         name: tencent-mcp-server
         version: 1.0.0
         request-timeout: 60s
@@ -124,7 +125,7 @@ document:
 # RAG 配置
 rag:
   top-k: 3  # 检索返回的最相似文档数量
-  model: "qwen3-max"  # 大语言模型名称
+  model: deepseek-v4-flash
   storage:
     base-dir: ./rag-data
     upload-dir: ./rag-data/uploads
@@ -194,3 +195,31 @@ prometheus:
 # CLS 云日志服务配置
 cls:
   mock-enabled: false  # 是否启用 Mock 模式（用于测试，设为 true 返回与告警关联的模拟日志数据）
+  secret-id: ${TENCENT_CLOUD_SECRET_ID:}
+  secret-key: ${TENCENT_CLOUD_SECRET_KEY:}
+  token: ${TENCENT_CLOUD_TOKEN:}
+  endpoint: ${TENCENT_CLS_ENDPOINT:cls.tencentcloudapi.com}
+  api-version: 2020-10-16
+  default-region: ${TENCENT_CLS_REGION:ap-guangzhou}
+  query-window-minutes: 30
+  timeout: 10
+  topics:
+    system-metrics: ${CLS_TOPIC_SYSTEM_METRICS:}
+    application-logs: ${CLS_TOPIC_APPLICATION_LOGS:}
+    database-slow-query: ${CLS_TOPIC_DATABASE_SLOW_QUERY:}
+    system-events: ${CLS_TOPIC_SYSTEM_EVENTS:}
+
+evaluation:
+  namespace: eval_report
+  report-path: target/eval-report.json
+  pass-threshold: 0.85
+  warn-threshold: 0.60
+  seed-rag-demo: true
+  llm:
+    models:
+      - deepseek-v4-flash
+      - qwen-plus
+      - qwen-turbo
+    max-tokens: 800
+    temperature: 0.2
+    top-p: 0.8

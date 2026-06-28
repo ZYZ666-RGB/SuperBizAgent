@@ -52,7 +52,7 @@ public class MarkdownFileParser implements DocumentParser {
     }
 
     private String toMarkdown(String fileName, String extension, String raw) {
-        if ("md".equals(extension)) {
+        if ("md".equals(extension) || "markdown".equals(extension)) {
             return raw;
         }
         if ("txt".equals(extension)) {

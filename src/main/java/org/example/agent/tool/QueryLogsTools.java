@@ -37,6 +37,33 @@ public class QueryLogsTools {
     
     @Value("${cls.mock-enabled:false}")
     private boolean mockEnabled;
+
+    @Value("${cls.default-region:ap-guangzhou}")
+    private String configuredDefaultRegion;
+
+    @Value("${cls.query-window-minutes:30}")
+    private int queryWindowMinutes;
+
+    @Value("${cls.timeout:10}")
+    private int clsTimeoutSeconds;
+
+    @Value("${cls.topics.system-metrics:${CLS_TOPIC_SYSTEM_METRICS:}}")
+    private String systemMetricsTopicId;
+
+    @Value("${cls.topics.application-logs:${CLS_TOPIC_APPLICATION_LOGS:}}")
+    private String applicationLogsTopicId;
+
+    @Value("${cls.topics.database-slow-query:${CLS_TOPIC_DATABASE_SLOW_QUERY:}}")
+    private String databaseSlowQueryTopicId;
+
+    @Value("${cls.topics.system-events:${CLS_TOPIC_SYSTEM_EVENTS:}}")
+    private String systemEventsTopicId;
+
+    private final TencentClsClient tencentClsClient;
+
+    public QueryLogsTools(TencentClsClient tencentClsClient) {
+        this.tencentClsClient = tencentClsClient;
+    }
     
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter
             .ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -165,7 +192,8 @@ public class QueryLogsTools {
             @ToolParam(description = "返回日志条数，默认20，最大100") Integer limit) {
         
         int actualLimit = (limit == null || limit <= 0) ? 20 : Math.min(limit, 100);
-        
+        String actualRegion = normalizeRegion(region);
+        String actualTopic = normalizeTopic(logTopic);
         String safeQuery = query == null ? "" : query;
         
 
@@ -174,18 +202,18 @@ public class QueryLogsTools {
             
             if (mockEnabled) {
                 // Mock 模式：返回与告警关联的模拟日志数据
-                logEntries = buildMockLogs(region, logTopic, safeQuery, actualLimit);
+                logEntries = buildMockLogs(actualRegion, actualTopic, safeQuery, actualLimit);
                 logger.info("使用 Mock 数据，返回 {} 条日志", logEntries.size());
             } else {
-                // 真实模式：调用 CLS API（这里预留接口，后续实现）
-                return buildErrorResponse("CLS 真实查询尚未实现，请启用 mock 模式进行测试");
+                logEntries = queryRealClsLogs(actualRegion, actualTopic, safeQuery, actualLimit);
+                logger.info("使用 CLS 真实查询，返回 {} 条日志", logEntries.size());
             }
             
             // 构建成功响应
             QueryLogsOutput output = new QueryLogsOutput();
             output.setSuccess(!logEntries.isEmpty());
-            output.setRegion(region);
-            output.setLogTopic(logTopic);
+            output.setRegion(actualRegion);
+            output.setLogTopic(actualTopic);
             output.setQuery(safeQuery.isBlank() ? "DEFAULT_QUERY" : safeQuery);
             output.setLogs(logEntries);
             output.setTotal(logEntries.size());
@@ -200,6 +228,117 @@ public class QueryLogsTools {
             logger.error("查询日志失败", e);
             return buildErrorResponse("查询失败: " + e.getMessage());
         }
+    }
+
+    private List<LogEntry> queryRealClsLogs(String region, String logTopic, String query, int limit) {
+        String topicId = resolveTopicId(logTopic);
+        String queryString = query == null || query.isBlank() ? "*" : query.trim();
+        Instant to = Instant.now();
+        Instant from = to.minus(Math.max(1, queryWindowMinutes), ChronoUnit.MINUTES);
+        TencentClsClient.SearchResponse response = tencentClsClient.search(new TencentClsClient.SearchRequest(
+                region,
+                topicId,
+                queryString,
+                limit,
+                from,
+                to,
+                clsTimeoutSeconds));
+        return response.records().stream()
+                .map(this::toLogEntry)
+                .toList();
+    }
+
+    private LogEntry toLogEntry(TencentClsClient.LogRecord record) {
+        Map<String, String> fields = record.fields() == null ? Map.of() : record.fields();
+        LogEntry entry = new LogEntry();
+        entry.setTimestamp(FORMATTER.format(clsTimestamp(record.timeMillis())));
+        entry.setLevel(firstField(fields, "level", "Level", "severity", "log_level"));
+        entry.setService(firstField(fields, "service", "service_name", "serviceName", "app", "application"));
+        entry.setInstance(firstNonBlank(
+                firstField(fields, "instance", "pod", "pod_name", "host", "hostname", "container"),
+                record.hostName(),
+                record.source()));
+        entry.setMessage(firstField(fields, "message", "msg", "content", "log", "RawLog", "__CONTENT__"));
+
+        Map<String, String> metrics = new HashMap<>(fields);
+        if (record.topicId() != null) {
+            metrics.put("topic_id", record.topicId());
+        }
+        if (record.topicName() != null) {
+            metrics.put("topic_name", record.topicName());
+        }
+        if (record.source() != null) {
+            metrics.put("source", record.source());
+        }
+        if (record.fileName() != null) {
+            metrics.put("file_name", record.fileName());
+        }
+        entry.setMetrics(metrics);
+        return entry;
+    }
+
+    private Instant clsTimestamp(long value) {
+        if (value <= 0L) {
+            return Instant.now();
+        }
+        if (value < 10_000_000_000L) {
+            return Instant.ofEpochSecond(value);
+        }
+        return Instant.ofEpochMilli(value);
+    }
+
+    private String normalizeRegion(String region) {
+        if (region == null || region.isBlank()) {
+            return configuredDefaultRegion == null || configuredDefaultRegion.isBlank()
+                    ? DEFAULT_REGION
+                    : configuredDefaultRegion.trim();
+        }
+        return region.trim();
+    }
+
+    private String normalizeTopic(String logTopic) {
+        if (logTopic == null || logTopic.isBlank()) {
+            return "system-metrics";
+        }
+        return logTopic.trim();
+    }
+
+    private String resolveTopicId(String logTopic) {
+        String topic = normalizeTopic(logTopic);
+        String mapped = switch (topic.toLowerCase()) {
+            case "system-metrics" -> systemMetricsTopicId;
+            case "application-logs" -> applicationLogsTopicId;
+            case "database-slow-query" -> databaseSlowQueryTopicId;
+            case "system-events" -> systemEventsTopicId;
+            default -> topic;
+        };
+        if (mapped == null || mapped.isBlank()) {
+            throw new IllegalStateException("CLS TopicId is not configured for '" + topic
+                    + "'. Set cls.topics." + topic + " or pass a real CLS TopicId.");
+        }
+        return mapped.trim();
+    }
+
+    private String firstField(Map<String, String> fields, String... keys) {
+        if (fields == null || fields.isEmpty()) {
+            return "";
+        }
+        for (String key : keys) {
+            String value = fields.get(key);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
     }
 
     /**
